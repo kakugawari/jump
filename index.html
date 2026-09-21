@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>スカイホッパー</title>
+<meta name="theme-color" content="#2b2740">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="スカイホッパー">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+  :root {
+    --navy: #0a1230;
+    --deep: #05070f;
+    --sky: #4aa3e8;
+    --lime: #7ee08a;
+    --amber: #ff9a3d;
+    --cyan: #3dd6f5;
+    --paper: #eef3f8;
+    --bg: var(--deep);
+  }
+  :root:not([data-theme="light"]) { --bg: var(--deep); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: var(--deep); }
+  }
+  :root[data-theme="dark"] { --bg: var(--deep); }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); overflow: hidden;
+    font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    color: var(--paper);
+  }
+  #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  #board {
+    position: relative; width: 100%; height: 100%;
+    max-width: min(100vw, calc(100dvh * 0.66));
+    max-height: 100dvh; overflow: hidden;
+  }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  .hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    padding: calc(env(safe-area-inset-top) + 10px) 14px 0;
+    display: flex; align-items: baseline; gap: 12px;
+    pointer-events: none; z-index: 5;
+    text-shadow: 0 2px 8px rgba(0,0,0,.6);
+  }
+  .h-num { font-size: 30px; font-weight: 800; letter-spacing: -.01em; color: #fff; font-variant-numeric: tabular-nums; }
+  .h-unit { font-size: 13px; opacity: .75; margin-left: 3px; font-weight: 600; }
+  .h-best { margin-left: auto; font-size: 12px; opacity: .7; font-weight: 600; }
+
+  .veil {
+    position: absolute; inset: 0; z-index: 10;
+    display: none; align-items: center; justify-content: center;
+    background: radial-gradient(120% 90% at 50% 40%, rgba(10,18,48,.86), rgba(5,7,15,.96));
+  }
+  .veil.on { display: flex; }
+  .card { text-align: center; padding: 26px 22px; max-width: 320px; }
+  .card h1 {
+    margin: 0 0 8px; font-size: 38px; font-weight: 800; letter-spacing: -.02em;
+    background: linear-gradient(180deg, #fff, var(--sky));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .card h2 { margin: 0 0 8px; font-size: 24px; font-weight: 800; }
+  .card p { margin: 0 0 20px; font-size: 14px; line-height: 1.85; opacity: .82; }
+  .card .big { font-size: 46px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
+  .card .note { color: var(--sky); font-size: 14px; font-weight: 600; min-height: 1.4em; margin: 2px 0 16px; }
+  button {
+    font-family: inherit; font-size: 16px; font-weight: 700; letter-spacing: .04em;
+    color: #04121f; background: linear-gradient(180deg, #7fdcff, var(--sky));
+    border: 0; border-radius: 12px; padding: 14px 36px; cursor: pointer;
+    box-shadow: 0 6px 24px rgba(74,163,232,.35);
+  }
+  button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  button:active { transform: translateY(1px); }
+  button.ghost {
+    margin-top: 12px; background: none; color: var(--paper);
+    box-shadow: none; border: 1px solid rgba(255,255,255,.3);
+    font-size: 13px; padding: 9px 20px; opacity: .85;
+  }
+  .picker { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 4px 0 10px; }
+  .slot {
+    width: 50px; padding: 8px 0 7px; border-radius: 14px; cursor: pointer;
+    background: rgba(255,255,255,.07); border: 2px solid transparent;
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+  }
+  .slot.on { border-color: #fff; background: rgba(255,255,255,.17); }
+  .blob {
+    width: 26px; height: 24px; border-radius: 50%;
+    border: 2px solid rgba(0,0,0,.28);
+    position: relative;
+  }
+  .blob::after {
+    content: ''; position: absolute; left: 5px; top: 4px;
+    width: 6px; height: 4px; border-radius: 50%;
+    background: rgba(255,255,255,.85);
+  }
+  .slot span { font-size: 10px; font-weight: 700; opacity: .9; }
+  .slot.lock { opacity: .6; }
+  .blob.lock {
+    background: #2a2840; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800; color: rgba(255,255,255,.55);
+    border-style: dashed; border-color: rgba(255,255,255,.3);
+  }
+  .blob.lock::after { display: none; }
+  .note.gold {
+    background: linear-gradient(90deg,#ff5a5a,#ffb14d,#ffe45a,#6ee07a,#4ec8f0,#7b7bff,#e07bff);
+    -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 800;
+  }
+  .pinfo { font-size: 12.5px; line-height: 1.7; min-height: 3.4em; opacity: .85; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="board">
+    <canvas id="cv"></canvas>
+
+    <div class="hud">
+      <div><span class="h-num" id="hM">0</span><span class="h-unit">m</span></div>
+      <div class="h-best">ベスト <span id="hBest">0</span>m</div>
+    </div>
+
+    <div class="veil on" id="vStart">
+      <div class="card">
+        <h1>スカイホッパー</h1>
+        <p>ビルの屋上から足場を乗り継いで、<br>夕焼けの雲をぬけて宇宙ステーションへ。</p>
+        <div class="picker" id="picker"></div>
+        <div class="pinfo" id="pinfo"></div>
+        <button id="bStart">スタート</button>
+      </div>
+    </div>
+
+    <div class="veil" id="vOver">
+      <div class="card">
+        <h2>落下</h2>
+        <div class="big"><span id="oM">0</span><span style="font-size:18px">m</span></div>
+        <div class="note" id="oNote"></div>
+        <button id="bRetry">もう一度</button>
+        <div><button class="ghost" id="bChange">スライムを変える</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ===== 調整値 =====
+  var G = 0.35;            // ふわっと長め
+  var LOWG = 0.18;         // 宇宙の低重力
+  var JUMP = -9.5;         // 到達高 ≒ 129px（低重力なら約251px）
+  var TRAMPO_F = -13.6;
+  var BOOST_F = -20.5;
+  var SPEED = 5.0;
+  var PXM = 10;
+  var SAFE_GAP = 104;      // 消えない足場どうしの最大間隔（129px未満）
+  var SAFE_GAP_LOW = 205;  // 低重力ゾーンでの最大間隔（251px未満）
+  var GOAL_M = 2000;       // 宇宙ステーション
+  var PW = 0.17;
+  var PH = 11;
+
+  var BEAM = 0, GONDOLA = 1, TRAMPO = 2, BOOST = 3,
+      GLASS = 4, CLOUD = 5, HOLO = 6, STATION = 7,
+      CONVEYOR = 8, CRUMBLE = 9;
+
+  var SKY = [
+    { m: 0,    t: [96, 78, 156],  b: [252, 168, 98] },
+    { m: 400,  t: [68, 54, 124],  b: [214, 112, 118] },
+    { m: 1000, t: [36, 32, 88],   b: [122, 64, 122] },
+    { m: 1550, t: [14, 16, 52],   b: [50, 36, 88] },
+    { m: 2050, t: [2, 3, 12],     b: [12, 14, 42] }
+  ];
+
+  // 性能は「ジャンプ 8.9 以上」を守る（それ未満だと届かない足場が出る）
+  var SLIMES = [
+    { n: 'あお',   c: '#4ec8f0', d: '#2b9ac6', b: '#7fdcf7',
+      jump: 9.5, speed: 5.0, grav: 1.0, wind: 1.0,
+      t: 'バランス型。まずはこれで。' },
+    { n: 'みどり', c: '#63d98a', d: '#2f9e5c', b: '#93ecab',
+      jump: 11.0, speed: 4.2, grav: 1.0, wind: 1.0,
+      t: 'ばね体質。よく跳ねるかわり横移動がおそい。' },
+    { n: 'きいろ', c: '#f5cf4e', d: '#c79c1f', b: '#ffe58a',
+      jump: 8.9, speed: 6.3, grav: 1.0, wind: .45,
+      t: 'すばやい。ビル風にも流されにくいが跳躍は低め。' },
+    { n: 'ピンク', c: '#f58fc0', d: '#c75b93', b: '#ffbcd9',
+      jump: 9.2, speed: 4.9, grav: .82, wind: 1.3,
+      t: 'ふわふわ。落ちるのがおそく空中で粘れるが風に弱い。' },
+    { n: 'にじ', rainbow: true, tough: true, c: '#fff', d: '#999', b: '#fff',
+      jump: 11.0, speed: 6.2, grav: .85, wind: .4,
+      t: '最強。高く跳ねて、速くて、ふわっと粘れて、風にも負けない。ぶつかってもほとんど弾かれない。' }
+  ];
+  var sel = 0, SL, JMP, TF, BF;
+  var rainbowOpen = false, newUnlock = false;
+
+  var cv, ctx, W, H, dpr;
+  var run = false;
+  var score = 0, best = 0;
+  var pl, plats, parts, foes, clouds, stars, city, planes;
+  var camY = 0, groundY = 0, goalY = 0, genY = 0;
+  var goalPut = false, goalGot = false, cheer = 0;
+  var keys = {}, touchX = null;
+  var frame = 0, hm = 0, invuln = 0;
+  var droneT = 0, debrisT = 0, planeT = 0;
+  var wind = 0, windTo = 0, windT = 260;
+  var raf = null;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var elM = $('hM'), elBest = $('hBest'), elOM = $('oM'), elNote = $('oNote');
+  var vStart = $('vStart'), vOver = $('vOver');
+
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function mToY(m) { return groundY - m * PXM; }
+  function yToM(y) { return (groundY - y) / PXM; }
+
+  function applySlime() {
+    SL = SLIMES[sel];
+    JMP = -SL.jump;
+    var k = SL.jump / 9.5;
+    TF = TRAMPO_F * k;
+    BF = BOOST_F * k;
+  }
+
+  function buildPicker() {
+    var box = $('picker');
+    box.innerHTML = '';
+    for (var i = 0; i < SLIMES.length; i++) {
+      (function (i) {
+        var s2 = SLIMES[i];
+        var locked = s2.rainbow && !rainbowOpen;
+        var d = document.createElement('div');
+        d.className = 'slot' + (i === sel ? ' on' : '') + (locked ? ' lock' : '');
+        if (locked) {
+          d.innerHTML = '<div class="blob lock">?</div><span>？？？</span>';
+          d.addEventListener('click', function () {
+            $('pinfo').textContent = 'ひみつのスライム。宇宙ステーションまで登ると仲間になる。';
+          });
+        } else {
+          var bg = s2.rainbow
+            ? 'conic-gradient(#ff5a5a,#ffb14d,#ffe45a,#6ee07a,#4ec8f0,#7b7bff,#e07bff,#ff5a5a)'
+            : s2.c;
+          d.innerHTML = '<div class="blob" style="background:' + bg + '"></div><span>' + s2.n + '</span>';
+          d.addEventListener('click', function () { pick(i); });
+        }
+        box.appendChild(d);
+      })(i);
+    }
+    $('pinfo').textContent = SLIMES[sel].t;
+  }
+  function pick(i) {
+    if (SLIMES[i].rainbow && !rainbowOpen) return;
+    sel = i;
+    applySlime();
+    try { localStorage.setItem('skyHopSlime', String(i)); } catch (e) {}
+    buildPicker();
+  }
+
+  function loadBest() {
+    try {
+      best = parseInt(localStorage.getItem('skyHopBest') || '0', 10) || 0;
+      rainbowOpen = localStorage.getItem('skyHopRainbow') === '1';
+      var sv = parseInt(localStorage.getItem('skyHopSlime') || '0', 10);
+      if (sv >= 0 && sv < SLIMES.length) sel = sv;
+      if (SLIMES[sel].rainbow && !rainbowOpen) sel = 0;
+    } catch (e) { best = 0; }
+    elBest.textContent = best;
+  }
+  function saveBest() {
+    if (score <= best) return;
+    best = score; elBest.textContent = best;
+    try { localStorage.setItem('skyHopBest', String(best)); } catch (e) {}
+  }
+
+  function fit() {
+    cv = $('cv');
+    ctx = cv.getContext('2d');
+    var r = cv.getBoundingClientRect();
+    dpr = window.devicePixelRatio || 1;
+    W = r.width; H = r.height;
+    cv.width = Math.round(W * dpr);
+    cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // ===== 背景 =====
+  function initBg() {
+    stars = [];
+    for (var i = 0; i < 95; i++) stars.push({ x: rnd(0, W), y: rnd(0, H * 3), r: rnd(.4, 1.6), a: rnd(.3, 1) });
+    clouds = [];
+    for (var m = 60; m < 1500; m += rnd(55, 120)) {
+      clouds.push({ x: rnd(-30, W + 30), m: m, s: rnd(.7, 1.7), a: rnd(.35, .8) });
+    }
+    city = [];
+    var x = -30;
+    while (x < W + 40) {
+      var w = rnd(26, 60);
+      city.push({ x: x, w: w, h: rnd(60, 190), lit: Math.random() });
+      x += w + rnd(3, 12);
+    }
+    planes = [];
+  }
+
+  function skyPair() {
+    var a = SKY[0], b = SKY[0];
+    for (var i = 0; i < SKY.length; i++) {
+      if (SKY[i].m <= hm) { a = SKY[i]; b = SKY[i]; }
+      if (SKY[i].m > hm) { b = SKY[i]; break; }
+    }
+    var t = b.m === a.m ? 0 : (hm - a.m) / (b.m - a.m);
+    function mix(c1, c2) {
+      return 'rgb(' + Math.round(c1[0] + (c2[0] - c1[0]) * t) + ',' +
+                      Math.round(c1[1] + (c2[1] - c1[1]) * t) + ',' +
+                      Math.round(c1[2] + (c2[2] - c1[2]) * t) + ')';
+    }
+    return [mix(a.t, b.t), mix(a.b, b.b)];
+  }
+
+  function drawSky() {
+    var c = skyPair();
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, c[0]); g.addColorStop(1, c[1]);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawSun() {
+    var fade = Math.max(0, 1 - Math.max(0, hm - 260) / 420);
+    if (fade <= .01) return;
+    var x = W * .22;
+    var y = (groundY - 150) - camY * .1;
+    if (y > H + 140 || y < -140) return;
+    ctx.save();
+    ctx.globalAlpha = fade;
+    var g = ctx.createRadialGradient(x, y, 20, x, y, 130);
+    g.addColorStop(0, 'rgba(255,190,110,.55)');
+    g.addColorStop(1, 'rgba(255,150,90,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, 130, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = '#ffd98a';
+    ctx.beginPath(); ctx.arc(x, y, 30, 0, 6.2832); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawStars() {
+    var a = Math.max(0, Math.min(1, (hm - 550) / 650));
+    if (a <= 0) return;
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      var y = ((s.y - camY * .22) % (H * 3) + H * 3) % (H * 3) - H;
+      if (y < -4 || y > H + 4) continue;
+      var tw = .8 + .2 * Math.sin(frame * .05 + i);
+      ctx.beginPath(); ctx.arc(s.x, y, s.r, 0, 6.2832);
+      ctx.fillStyle = 'rgba(255,255,255,' + (s.a * a * tw) + ')'; ctx.fill();
+    }
+  }
+
+  function drawClouds() {
+    for (var i = 0; i < clouds.length; i++) {
+      var c = clouds[i];
+      var y = mToY(c.m) - camY * .82;
+      if (y < -70 || y > H + 70) continue;
+      c.x += wind * .55;
+      if (c.x < -90) c.x = W + 80;
+      if (c.x > W + 90) c.x = -80;
+      ctx.save();
+      ctx.globalAlpha = c.a * Math.max(0, 1 - Math.max(0, c.m - 1100) / 400);
+      ctx.fillStyle = c.m < 350 ? '#ffd2a6' : (c.m < 800 ? '#e6b8c6' : '#d8d4e8');
+      ctx.beginPath();
+      ctx.ellipse(c.x, y, 30 * c.s, 11 * c.s, 0, 0, 6.2832);
+      ctx.ellipse(c.x + 20 * c.s, y + 4 * c.s, 19 * c.s, 8 * c.s, 0, 0, 6.2832);
+      ctx.ellipse(c.x - 22 * c.s, y + 5 * c.s, 16 * c.s, 7 * c.s, 0, 0, 6.2832);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // 遠くを横切る飛行機（飾り）
+  function stepPlanes() {
+    if (hm > 250 && hm < 1300 && --planeT <= 0 && planes.length < 2) {
+      var d = Math.random() < .5 ? 1 : -1;
+      planes.push({ x: d > 0 ? -70 : W + 70, y: camY + rnd(H * .1, H * .6), vx: d * rnd(.9, 1.5), dir: d });
+      planeT = rnd(500, 1100);
+    }
+    for (var i = planes.length - 1; i >= 0; i--) {
+      planes[i].x += planes[i].vx;
+      if (planes[i].x > W + 120 || planes[i].x < -120) planes.splice(i, 1);
+    }
+  }
+  function drawPlanes() {
+    for (var i = 0; i < planes.length; i++) {
+      var p = planes[i], y = p.y - camY;
+      if (y < -40 || y > H + 40) continue;
+      ctx.save();
+      ctx.globalAlpha = .55;
+      ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(p.x - p.dir * 8, y); ctx.lineTo(p.x - p.dir * 70, y + 1); ctx.stroke();
+      ctx.fillStyle = '#e9eef5';
+      ctx.beginPath();
+      ctx.moveTo(p.x + p.dir * 9, y);
+      ctx.lineTo(p.x - p.dir * 7, y - 2.5);
+      ctx.lineTo(p.x - p.dir * 7, y + 2.5);
+      ctx.closePath(); ctx.fill();
+      ctx.fillRect(p.x - p.dir * 4, y - 5, 2, 10);
+      ctx.restore();
+    }
+  }
+
+  // 近づいてくる宇宙ステーション
+  function drawStationFar() {
+    if (goalGot || hm < 1150 || hm >= GOAL_M) return;
+    var p = Math.min(1, (hm - 1150) / 850);
+    var s = .35 + p * 1.5;
+    var x = W * .7, y = 84 + p * 16;
+    ctx.save();
+    ctx.globalAlpha = hm > 1940 ? Math.max(0, 1 - (hm - 1940) / 60) : .95;
+    ctx.translate(x, y); ctx.scale(s, s); ctx.rotate(Math.sin(frame * .004) * .12);
+    ctx.fillStyle = '#20406e';
+    ctx.fillRect(-40, -3, 80, 6);
+    ctx.fillStyle = '#c8d6e6';
+    ctx.fillRect(-13, -9, 26, 18);
+    ctx.fillStyle = '#7fb2ff';
+    ctx.fillRect(-40, -11, 22, 22);
+    ctx.fillRect(18, -11, 22, 22);
+    ctx.strokeStyle = 'rgba(20,40,80,.6)'; ctx.lineWidth = 1;
+    for (var i = -3; i <= 3; i++) {
+      ctx.beginPath(); ctx.moveTo(-29 + i * 0, -11); ctx.lineTo(-29, 11); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // 出発地点の街
+  function drawCity() {
+    var gy = groundY - camY;
+    if (gy > H + 260) return;
+    ctx.save();
+    // 後ろのビル群
+    for (var i = 0; i < city.length; i++) {
+      var b = city[i];
+      var by = gy + 24;
+      ctx.fillStyle = '#2b2740';
+      ctx.fillRect(b.x, by - b.h, b.w, b.h + 120);
+      for (var wy = by - b.h + 8; wy < by + 40; wy += 12) {
+        for (var wx = b.x + 5; wx < b.x + b.w - 5; wx += 10) {
+          var on = ((wx * 7 + wy * 13 + (i * 31)) % 11) < 4;
+          ctx.fillStyle = on ? 'rgba(255,214,140,.75)' : 'rgba(255,255,255,.07)';
+          ctx.fillRect(wx, wy, 5, 6);
+        }
+      }
+    }
+    // 出発ビルの屋上
+    ctx.fillStyle = '#413a58';
+    ctx.fillRect(0, gy, W, 30);
+    ctx.fillStyle = '#564d70';
+    ctx.fillRect(0, gy, W, 5);
+    ctx.fillStyle = '#2b384d';
+    for (var k = 0; k < 5; k++) ctx.fillRect(10 + k * (W / 5), gy + 10, 22, 14);
+    // アンテナ
+    ctx.strokeStyle = '#8fa3bd'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(W * .84, gy); ctx.lineTo(W * .84, gy - 34); ctx.stroke();
+    ctx.fillStyle = (frame % 60 < 30) ? '#ff5a5a' : 'rgba(255,90,90,.25)';
+    ctx.beginPath(); ctx.arc(W * .84, gy - 37, 3, 0, 6.2832); ctx.fill();
+    ctx.restore();
+  }
+
+  // ===== 足場 =====
+  function mk(x, y, type, w) {
+    return { x: x, y: y, w: Math.max(44, w), h: PH, type: type,
+             dead: false, crack: false, fading: false, ft: 0,
+             ph: rnd(0, 6.28), dir: Math.random() < .5 ? 1 : -1, sp: rnd(.9, 2.3),
+             fallT: 0, fv: 0 };
+  }
+
+  function spineType(m) {
+    var r = Math.random();
+    if (m < 90) return BEAM;
+    if (m < 450) { if (r < .13) return GONDOLA; if (r < .23) return TRAMPO; if (r < .31) return CONVEYOR; return BEAM; }
+    if (m < 1100) { if (r < .20) return GONDOLA; if (r < .31) return TRAMPO; if (r < .35) return BOOST; if (r < .45) return CONVEYOR; return BEAM; }
+    if (r < .26) return GONDOLA;
+    if (r < .37) return TRAMPO;
+    if (r < .43) return BOOST;
+    if (r < .55) return CONVEYOR;
+    return BEAM;
+  }
+  function bonusType(m) {
+    var r = Math.random();
+    if (m < 300) return r < .35 ? CRUMBLE : GLASS;
+    if (m < 900) { if (r < .34) return CLOUD; if (r < .6) return GLASS; return CRUMBLE; }
+    if (r < .3) return HOLO;
+    if (r < .52) return GLASS;
+    if (r < .76) return CRUMBLE;
+    return CLOUD;
+  }
+  function gap(m, y) {
+    var d = Math.min(m / 1800, 1);
+    var raw = (H / 8) * (.55 + Math.random() * .8) * (1 + d * .35);
+    if (y < goalY) return Math.min(raw * 1.9, SAFE_GAP_LOW);
+    return Math.min(raw, SAFE_GAP);
+  }
+  function wmul(m, t) {
+    var lo, hi;
+    if (m < 400) { lo = 1.0; hi = 1.5; }
+    else if (m < 1200) { lo = .85; hi = 1.3; }
+    else { lo = .72; hi = 1.15; }
+    var v = lo + Math.random() * (hi - lo);
+    if (t === TRAMPO || t === BOOST) v = Math.max(v, .95);
+    return v;
+  }
+
+  function fillUpTo(topY) {
+    var base = W * PW;
+    while (genY > topY) {
+      if (!goalPut && genY - goalY <= SAFE_GAP) {
+        var st = mk(0, goalY, STATION, W);
+        st.h = 18; plats.push(st);
+        goalPut = true; genY = goalY; continue;
+      }
+      var g = gap(yToM(genY), genY);
+      var ny = genY - g;
+      if (!goalPut && ny < goalY + 80) ny = goalY + 80;
+
+      var m = yToM(ny);
+      var t = spineType(m);
+      var w = base * wmul(m, t);
+      plats.push(mk(rnd(0, W - w), ny, t, w));
+
+      if (g > 54 && Math.random() < (m < 300 ? .25 : .52)) {
+        var bt = bonusType(m);
+        var bw = base * wmul(m, bt) * .88;
+        plats.push(mk(rnd(0, W - bw), ny + g * (.35 + Math.random() * .3), bt, bw));
+      }
+      genY = ny;
+    }
+  }
+
+  function holoOn(p) { return (frame + ((p.ph * 31) | 0)) % 165 < 98; }
+
+  function drawPlat(p) {
+    var y = p.y - camY;
+    if (p.dead || y < -60 || y > H + 80) return;
+    if (p.ground) return;
+    var x = p.x;
+    if (p.type === GLASS && p.crack) { x += rnd(-1.5, 1.5); y += rnd(-1, 1); }
+
+    // 宇宙ステーション（ゴール足場）
+    if (p.type === STATION) {
+      ctx.save();
+      ctx.fillStyle = '#b9c7d9'; ctx.fillRect(0, y, W, p.h + 70);
+      ctx.fillStyle = '#dde6f0'; ctx.fillRect(0, y, W, 5);
+      ctx.fillStyle = '#8fa2b8';
+      for (var i = 0; i < 6; i++) ctx.fillRect((i * 97) % (W - 30) + 8, y + 22, 26, 10);
+      // ソーラーパネル
+      ctx.fillStyle = '#2f6fbf';
+      ctx.fillRect(W * .06, y + 40, W * .34, 22);
+      ctx.fillRect(W * .6, y + 40, W * .34, 22);
+      ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1;
+      for (var s2 = 0; s2 < 7; s2++) {
+        var sx = W * .06 + (W * .34) * s2 / 7;
+        ctx.beginPath(); ctx.moveTo(sx, y + 40); ctx.lineTo(sx, y + 62); ctx.stroke();
+        var sx2 = W * .6 + (W * .34) * s2 / 7;
+        ctx.beginPath(); ctx.moveTo(sx2, y + 40); ctx.lineTo(sx2, y + 62); ctx.stroke();
+      }
+      if (goalGot) {
+        ctx.fillStyle = (frame % 50 < 25) ? '#7ee08a' : 'rgba(126,224,138,.3)';
+        ctx.beginPath(); ctx.arc(W * .5, y - 8, 4, 0, 6.2832); ctx.fill();
+      }
+      ctx.restore();
+      return;
+    }
+
+    // 雲（一度乗ると消える）
+    if (p.type === CLOUD) {
+      ctx.save();
+      ctx.globalAlpha = p.fading ? Math.max(0, 1 - p.ft / 16) : 1;
+      ctx.fillStyle = '#fbfdff';
+      ctx.beginPath();
+      ctx.ellipse(x + p.w * .5, y + p.h * .5, p.w * .5, p.h * .8, 0, 0, 6.2832);
+      ctx.ellipse(x + p.w * .24, y + p.h * .6, p.w * .22, p.h * .6, 0, 0, 6.2832);
+      ctx.ellipse(x + p.w * .76, y + p.h * .6, p.w * .22, p.h * .6, 0, 0, 6.2832);
+      ctx.fill();
+      ctx.globalAlpha *= .4; ctx.fillStyle = '#b9ccdd';
+      ctx.beginPath(); ctx.ellipse(x + p.w * .5, y + p.h * .9, p.w * .4, p.h * .3, 0, 0, 6.2832); ctx.fill();
+      ctx.restore();
+      return;
+    }
+
+    // ホログラム足場（点滅）
+    if (p.type === HOLO) {
+      ctx.save();
+      if (!holoOn(p)) {
+        ctx.globalAlpha = .2; ctx.strokeStyle = '#3dd6f5'; ctx.lineWidth = 1.2;
+        ctx.setLineDash([4, 5]);
+        rr(x, y, p.w, p.h, 3); ctx.stroke();
+        ctx.restore(); return;
+      }
+      var cnt = (frame + ((p.ph * 31) | 0)) % 165;
+      if (cnt > 80 && cnt % 6 < 3) ctx.globalAlpha = .45;
+      ctx.fillStyle = 'rgba(61,214,245,.35)';
+      rr(x, y, p.w, p.h, 3); ctx.fill();
+      ctx.strokeStyle = '#3dd6f5'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1;
+      for (var ly = y + 2; ly < y + p.h; ly += 3) {
+        ctx.beginPath(); ctx.moveTo(x + 2, ly); ctx.lineTo(x + p.w - 2, ly); ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    }
+
+    ctx.save();
+
+    // ベルトコンベア（乗ると横に流される）
+    if (p.type === CONVEYOR) {
+      rr(x, y, p.w, p.h, p.h / 2);
+      ctx.fillStyle = '#3b4557'; ctx.fill();
+      ctx.fillStyle = '#ffc861';
+      var off = (frame * p.dir * 1.6) % 12;
+      for (var cxp = -12; cxp < p.w + 12; cxp += 12) {
+        var ax = x + cxp + off;
+        if (ax < x + 3 || ax > x + p.w - 3) continue;
+        ctx.beginPath();
+        ctx.moveTo(ax - 3, y + 3); ctx.lineTo(ax + 3 * p.dir + (p.dir > 0 ? 0 : 0), y + p.h / 2);
+        ctx.lineTo(ax - 3, y + p.h - 3);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.fillStyle = '#9aa7ba';
+      ctx.beginPath(); ctx.arc(x + p.h / 2, y + p.h / 2, p.h / 2 - 2, 0, 6.2832); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + p.w - p.h / 2, y + p.h / 2, p.h / 2 - 2, 0, 6.2832); ctx.fill();
+      ctx.restore(); return;
+    }
+
+    // 崩れる足場（乗るとしばらくして落ちる）
+    if (p.type === CRUMBLE) {
+      var sh2 = p.fallT > 0 && p.fallT <= 18 ? rnd(-1.5, 1.5) : 0;
+      rr(x + sh2, y, p.w, p.h, 2);
+      ctx.fillStyle = '#b08a5e'; ctx.fill();
+      ctx.fillStyle = '#8a6942'; ctx.fillRect(x + sh2, y + p.h - 3, p.w, 3);
+      ctx.strokeStyle = 'rgba(60,40,20,.55)'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x + sh2 + p.w * .33, y); ctx.lineTo(x + sh2 + p.w * .33, y + p.h);
+      ctx.moveTo(x + sh2 + p.w * .66, y); ctx.lineTo(x + sh2 + p.w * .66, y + p.h);
+      ctx.stroke();
+      ctx.restore(); return;
+    }
+
+    // ゴンドラ（左右に動く）
+    if (p.type === GONDOLA) {
+      ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x + 6, y); ctx.lineTo(x + 6, y - 40);
+      ctx.moveTo(x + p.w - 6, y); ctx.lineTo(x + p.w - 6, y - 40);
+      ctx.stroke();
+      rr(x, y, p.w, p.h, 2);
+      ctx.fillStyle = '#f2c14e'; ctx.fill();
+      ctx.fillStyle = '#c9982f'; ctx.fillRect(x, y + p.h - 3, p.w, 3);
+      ctx.strokeStyle = '#8c6a1c'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x + 2, y); ctx.lineTo(x + 2, y - 9);
+      ctx.lineTo(x + p.w - 2, y - 9); ctx.lineTo(x + p.w - 2, y);
+      ctx.stroke();
+      ctx.restore(); return;
+    }
+
+    // トランポリン（大ジャンプ）
+    if (p.type === TRAMPO) {
+      var bend = 3 + Math.sin(frame * .1 + p.ph) * 1.5;
+      ctx.fillStyle = '#2b3b55';
+      ctx.fillRect(x, y + p.h - 3, p.w, 6);
+      ctx.fillRect(x + 2, y + p.h, 4, 9);
+      ctx.fillRect(x + p.w - 6, y + p.h, 4, 9);
+      ctx.strokeStyle = '#7ee08a'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x + 3, y + 3);
+      ctx.quadraticCurveTo(x + p.w / 2, y + 3 + bend, x + p.w - 3, y + 3);
+      ctx.stroke();
+      ctx.restore(); return;
+    }
+
+    // ブースター台（超大ジャンプ）
+    if (p.type === BOOST) {
+      rr(x, y, p.w, p.h, 3);
+      ctx.fillStyle = '#4a5468'; ctx.fill();
+      ctx.fillStyle = '#ff9a3d';
+      ctx.fillRect(x + 3, y + 2, p.w - 6, 3);
+      var cx0 = x + p.w / 2;
+      ctx.fillStyle = '#d8dee8';
+      ctx.fillRect(cx0 - 7, y - 13, 14, 13);
+      ctx.fillStyle = '#ff9a3d';
+      ctx.beginPath();
+      ctx.moveTo(cx0, y - 22); ctx.lineTo(cx0 - 7, y - 13); ctx.lineTo(cx0 + 7, y - 13);
+      ctx.closePath(); ctx.fill();
+      var f = 3 + Math.abs(Math.sin(frame * .3)) * 5;
+      ctx.fillStyle = '#ffb14d';
+      ctx.beginPath(); ctx.moveTo(cx0 - 5, y); ctx.lineTo(cx0, y + f); ctx.lineTo(cx0 + 5, y); ctx.closePath(); ctx.fill();
+      ctx.restore(); return;
+    }
+
+    // ガラス（2回目で割れる）
+    if (p.type === GLASS) {
+      rr(x, y, p.w, p.h, 2);
+      ctx.fillStyle = p.crack ? 'rgba(168,196,222,.55)' : 'rgba(198,230,250,.62)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.5)';
+      ctx.beginPath(); ctx.moveTo(x + 4, y + p.h - 3); ctx.lineTo(x + p.w * .4, y + 3); ctx.stroke();
+      if (p.crack) {
+        ctx.strokeStyle = 'rgba(40,70,100,.85)'; ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + p.w * .2, y); ctx.lineTo(x + p.w * .45, y + p.h * .55); ctx.lineTo(x + p.w * .35, y + p.h);
+        ctx.moveTo(x + p.w * .45, y + p.h * .55); ctx.lineTo(x + p.w * .75, y + p.h * .3);
+        ctx.moveTo(x + p.w * .45, y + p.h * .55); ctx.lineTo(x + p.w * .62, y + p.h);
+        ctx.stroke();
+      }
+      ctx.restore(); return;
+    }
+
+    // 鉄骨（ふつう）／宇宙ではソーラーパネル
+    var space = p.y < goalY;
+    rr(x, y, p.w, p.h, 2);
+    ctx.fillStyle = space ? '#2f6fbf' : '#8d99ad';
+    ctx.fill();
+    if (space) {
+      ctx.strokeStyle = 'rgba(180,220,255,.5)'; ctx.lineWidth = 1;
+      for (var g2 = 1; g2 < 5; g2++) {
+        var gx = x + p.w * g2 / 5;
+        ctx.beginPath(); ctx.moveTo(gx, y + 1); ctx.lineTo(gx, y + p.h - 1); ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(x + 2, y + 1.5, p.w - 4, 2);
+    } else {
+      ctx.fillStyle = '#b3bccb'; ctx.fillRect(x + 2, y + 1.5, p.w - 4, 2.5);
+      ctx.fillStyle = '#5f6a7c'; ctx.fillRect(x, y + p.h - 3, p.w, 3);
+      ctx.fillStyle = 'rgba(40,48,60,.7)';
+      for (var bx = x + 5; bx < x + p.w - 3; bx += 11) {
+        ctx.beginPath(); ctx.arc(bx, y + p.h / 2, 1.3, 0, 6.2832); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  // ===== プレイヤー =====
+  function newPlayer() {
+    return { x: W / 2 - 15, y: groundY - 26, w: 30, h: 26, vy: JMP, kx: 0, sq: 0 };
+  }
+
+  function drawPlayer() {
+    var px = pl.x, py = pl.y - camY, w = pl.w, h = pl.h;
+    var st = Math.max(-1, Math.min(1, pl.vy / 13));
+    var stretch = pl.vy < 0 ? -st * .22 : st * .10;
+    var R = w * .5;
+    var wob = Math.sin(frame * .18) * (.8 + pl.sq * 2.2);
+    var rx = R * (1 + pl.sq * .30 - stretch * .45) + wob;
+    var ry = R * (1 - pl.sq * .26 + stretch) - wob;
+    var cx = px + w / 2, by = py + h, cy = by - ry;
+
+    ctx.save();
+    if (invuln > 0 && (invuln >> 2) % 2 === 0) ctx.globalAlpha = .45;
+
+    ctx.fillStyle = 'rgba(0,0,0,.2)';
+    ctx.beginPath(); ctx.ellipse(cx, by + 2, rx * .85, 3, 0, 0, 6.2832); ctx.fill();
+
+    // まるい体
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, 6.2832);
+    var cF = SL.c, cD = SL.d, cB = SL.b;
+    if (SL.rainbow) {
+      var hue = (frame * 4) % 360;
+      cF = 'hsl(' + hue + ',90%,62%)';
+      cD = 'hsl(' + hue + ',75%,42%)';
+      cB = 'hsl(' + ((hue + 50) % 360) + ',95%,80%)';
+      // うしろの光
+      ctx.save();
+      ctx.globalAlpha *= .35;
+      ctx.fillStyle = 'hsl(' + ((hue + 180) % 360) + ',100%,75%)';
+      ctx.beginPath(); ctx.ellipse(cx, cy, rx * 1.5, ry * 1.5, 0, 0, 6.2832); ctx.fill();
+      ctx.restore();
+      ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, 6.2832);
+    }
+    ctx.fillStyle = cF; ctx.fill();
+    ctx.strokeStyle = cD; ctx.lineWidth = 1.6; ctx.stroke();
+
+    // おなかの明るいところ
+    ctx.fillStyle = cB;
+    ctx.beginPath(); ctx.ellipse(cx, cy + ry * .34, rx * .55, ry * .34, 0, 0, 6.2832); ctx.fill();
+    // 光沢
+    ctx.fillStyle = 'rgba(255,255,255,.88)';
+    ctx.beginPath(); ctx.ellipse(cx - rx * .34, cy - ry * .44, rx * .2, ry * .13, -.5, 0, 6.2832); ctx.fill();
+
+    // 目
+    var blink = (frame % 210) < 8;
+    var ey = cy - ry * .12, ex = rx * .34;
+    ctx.fillStyle = '#12314a';
+    if (blink) {
+      ctx.fillRect(cx - ex - 2.4, ey, 4.8, 1.6);
+      ctx.fillRect(cx + ex - 2.4, ey, 4.8, 1.6);
+    } else {
+      ctx.beginPath(); ctx.ellipse(cx - ex, ey, 2.4, 3.1, 0, 0, 6.2832); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx + ex, ey, 2.4, 3.1, 0, 0, 6.2832); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.9)';
+      ctx.beginPath(); ctx.arc(cx - ex + .9, ey - 1.1, .9, 0, 6.2832); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + ex + .9, ey - 1.1, .9, 0, 6.2832); ctx.fill();
+    }
+    // 口
+    ctx.strokeStyle = 'rgba(18,49,74,.8)'; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
+    ctx.beginPath();
+    if (pl.vy < -6) { ctx.arc(cx, cy + ry * .22, 3.2, .15 * Math.PI, .85 * Math.PI); }
+    else { ctx.moveTo(cx - 3, cy + ry * .28); ctx.quadraticCurveTo(cx, cy + ry * .40, cx + 3, cy + ry * .28); }
+    ctx.stroke();
+
+    // 高いところではヘルメット
+    if (hm >= 1400) {
+      var hr = Math.max(rx, ry) * 1.32;
+      ctx.strokeStyle = 'rgba(200,235,255,.7)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(cx, cy, hr, 0, 6.2832); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(cx, cy, hr, Math.PI * 1.1, Math.PI * 1.45); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ===== 粒 =====
+  function burst(x, y, c, n) {
+    for (var i = 0; i < n; i++) {
+      parts.push({ x: x, y: y, vx: rnd(-2, 2), vy: rnd(-3.5, .5), life: 1, c: c, r: rnd(1, 3.5) });
+    }
+  }
+  function confetti(x, y) {
+    var cs = ['#ff9a3d', '#3dd6f5', '#7ee08a', '#ffe08a', '#fff'];
+    for (var i = 0; i < 46; i++) {
+      parts.push({ x: x + rnd(-W * .4, W * .4), y: y + rnd(-25, 25),
+                   vx: rnd(-1.6, 1.6), vy: rnd(-4.5, -1), life: 1.5,
+                   c: cs[i % cs.length], r: rnd(1.5, 4) });
+    }
+  }
+  function stepParts() {
+    for (var i = parts.length - 1; i >= 0; i--) {
+      var p = parts[i];
+      p.x += p.vx; p.y += p.vy; p.vy += .06; p.life -= .028;
+      if (p.life <= 0) parts.splice(i, 1);
+    }
+  }
+  function drawParts() {
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      ctx.globalAlpha = Math.min(1, p.life);
+      ctx.beginPath(); ctx.arc(p.x, p.y - camY, p.r, 0, 6.2832);
+      ctx.fillStyle = p.c; ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ===== じゃまもの =====
+  function knock(dx, down) {
+    if (invuln > 0) return;
+    if (SL.tough) {
+      invuln = 45;
+      pl.kx = dx * 1.1;
+      burst(pl.x + pl.w / 2, pl.y + pl.h / 2, '#ffffff', 10);
+      return;
+    }
+    invuln = 85;
+    pl.vy = Math.max(pl.vy, down || 2.6);
+    pl.kx = dx * 3.6;
+    burst(pl.x + pl.w / 2, pl.y + pl.h / 2, '#dbe6f2', 8);
+  }
+  function countFoe(k) {
+    var n = 0;
+    for (var i = 0; i < foes.length; i++) if (foes[i].k === k) n++;
+    return n;
+  }
+  function stepFoes() {
+    if (cheer <= 0) {
+      if (hm > 240 && hm < 1500 && --droneT <= 0) {
+        if (countFoe('drone') < 2) {
+          var d = Math.random() < .5 ? 1 : -1;
+          foes.push({ k: 'drone', st: 'warn', t: 55, dir: d, x: d > 0 ? -34 : W + 34,
+                      oy: H * rnd(.12, .5), y: 0, vx: d * rnd(2.1, 3.3), bob: rnd(0, 6.28) });
+        }
+        droneT = rnd(200, 420);
+      }
+      if (hm > 950 && --debrisT <= 0) {
+        if (countFoe('debris') < 3) {
+          var y0 = camY - 50, x0 = rnd(0, W), vy = rnd(5.5, 8);
+          var tx2 = pl.x + pl.w / 2 + rnd(-90, 90);
+          var fr = Math.max((pl.y - y0) / vy, 1);
+          foes.push({ k: 'debris', st: 'warn', t: 62, x: x0, oy: -50, y: y0,
+                      vx: Math.max(-4.5, Math.min(4.5, (tx2 - x0) / fr)), vy: vy,
+                      rot: rnd(0, 6.28), rv: rnd(-.12, .12) });
+        }
+        debrisT = rnd(170, 330);
+      }
+    }
+    for (var i = foes.length - 1; i >= 0; i--) {
+      var f = foes[i];
+      if (f.st === 'warn') {
+        f.y = camY + f.oy;
+        if (--f.t <= 0) f.st = 'go';
+        continue;
+      }
+      if (f.k === 'drone') {
+        f.x += f.vx; f.bob += .2;
+        var my = f.y + Math.sin(f.bob) * 10;
+        if (invuln <= 0 && pl.x + pl.w > f.x - 15 && pl.x < f.x + 15 &&
+            pl.y + pl.h > my - 10 && pl.y < my + 10) knock(f.dir);
+        if (f.x > W + 60 || f.x < -60) foes.splice(i, 1);
+      } else {
+        f.x += f.vx; f.y += f.vy; f.rot += f.rv;
+        if (frame % 2 === 0) {
+          parts.push({ x: f.x - f.vx, y: f.y - f.vy, vx: rnd(-.8, .8), vy: rnd(-.8, .8),
+                       life: .5, c: Math.random() < .5 ? '#ff9a3d' : '#ffe08a', r: rnd(1, 3) });
+        }
+        var dx = f.x - (pl.x + pl.w / 2), dy = f.y - (pl.y + pl.h / 2);
+        if (invuln <= 0 && dx * dx + dy * dy < 24 * 24) knock(f.vx >= 0 ? 1 : -1);
+        if (f.y > camY + H + 70) foes.splice(i, 1);
+      }
+    }
+  }
+  function edgeWarn(dir, sy) {
+    var x = dir > 0 ? 15 : W - 15;
+    var y = Math.max(26, Math.min(H - 14, sy));
+    ctx.save();
+    ctx.globalAlpha = .35 + .6 * Math.abs(Math.sin(frame * .2));
+    ctx.fillStyle = '#ff5a5a'; ctx.font = '800 18px system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('!', x, y);
+    ctx.restore();
+  }
+  function drawFoes() {
+    for (var i = 0; i < foes.length; i++) {
+      var f = foes[i];
+      if (f.k === 'drone') {
+        if (f.st === 'warn') { edgeWarn(f.dir, f.y - camY); continue; }
+        var y = f.y + Math.sin(f.bob) * 10 - camY;
+        if (y < -30 || y > H + 30) continue;
+        ctx.save();
+        // アーム
+        ctx.strokeStyle = '#3c465a'; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(f.x - 11, y - 4); ctx.lineTo(f.x + 11, y + 2);
+        ctx.moveTo(f.x + 11, y - 4); ctx.lineTo(f.x - 11, y + 2);
+        ctx.stroke();
+        // ローター
+        ctx.strokeStyle = 'rgba(200,220,240,.55)'; ctx.lineWidth = 1.5;
+        var spin = (frame % 6 < 3) ? 8 : 4;
+        for (var q = 0; q < 4; q++) {
+          var rx = f.x + (q % 2 ? 11 : -11), ry = y + (q < 2 ? -4 : 2);
+          ctx.beginPath(); ctx.ellipse(rx, ry, spin, 2, 0, 0, 6.2832); ctx.stroke();
+        }
+        // 本体
+        ctx.fillStyle = '#2b3446';
+        rr(f.x - 9, y - 4, 18, 9, 3); ctx.fill();
+        ctx.fillStyle = (frame % 40 < 20) ? '#ff5a5a' : '#3dd6f5';
+        ctx.beginPath(); ctx.arc(f.x + f.dir * 6, y, 2, 0, 6.2832); ctx.fill();
+        // カメラ
+        ctx.fillStyle = '#4a5468';
+        ctx.beginPath(); ctx.arc(f.x, y + 6, 3.5, 0, 6.2832); ctx.fill();
+        ctx.restore();
+      } else {
+        var ey = f.y - camY;
+        if (f.st === 'warn') {
+          var len = Math.sqrt(f.vx * f.vx + f.vy * f.vy);
+          ctx.save();
+          ctx.globalAlpha = .25 + .45 * Math.abs(Math.sin(frame * .15));
+          ctx.strokeStyle = '#ff7a4d'; ctx.lineWidth = 2; ctx.setLineDash([5, 8]);
+          ctx.beginPath(); ctx.moveTo(f.x, ey);
+          ctx.lineTo(f.x + (f.vx / len) * H * 1.6, ey + (f.vy / len) * H * 1.6);
+          ctx.stroke(); ctx.setLineDash([]);
+          ctx.beginPath(); ctx.arc(f.x, Math.max(ey, 14), 6, 0, 6.2832);
+          ctx.fillStyle = '#ff7a4d'; ctx.fill();
+          ctx.restore();
+          continue;
+        }
+        if (ey < -40 || ey > H + 40) continue;
+        ctx.save();
+        ctx.translate(f.x, ey); ctx.rotate(f.rot);
+        ctx.fillStyle = '#7a8496';
+        ctx.beginPath();
+        for (var v = 0; v < 7; v++) {
+          var a = (6.2832 / 7) * v, rr3 = 11 * (.75 + ((v * 37) % 10) / 28);
+          if (v === 0) ctx.moveTo(Math.cos(a) * rr3, Math.sin(a) * rr3);
+          else ctx.lineTo(Math.cos(a) * rr3, Math.sin(a) * rr3);
+        }
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#5a6476';
+        ctx.beginPath(); ctx.arc(-3, -2, 3, 0, 6.2832); ctx.fill();
+        ctx.restore();
+      }
+    }
+  }
+
+  // ===== ビル風 =====
+  function stepWind() {
+    if (hm < 200) { wind = 0; windTo = 0; return; }
+    if (--windT <= 0) {
+      if (Math.abs(windTo) > .05) { windTo = 0; windT = rnd(240, 460); }
+      else { windTo = (Math.random() < .5 ? -1 : 1) * rnd(.5, 1.05); windT = rnd(220, 380); }
+    }
+    wind += (windTo - wind) * .02;
+  }
+  function drawWind() {
+    if (Math.abs(wind) < .12) return;
+    var n = Math.min(1, Math.abs(wind) / 1.05);
+    ctx.save();
+    ctx.globalAlpha = .25 + n * .35;
+    ctx.strokeStyle = '#dceaff'; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
+    for (var i = 0; i < 5; i++) {
+      var y = 46 + i * 9;
+      var off = ((frame * wind * 2.4) % (W + 90)) - 45;
+      var len = 16 + i * 6 * n;
+      var x = ((off + i * 57) % (W + 90) + (W + 90)) % (W + 90) - 45;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len * (wind < 0 ? -1 : 1), y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawCheer() {
+    if (cheer <= 0) return;
+    var a = Math.min(1, cheer / 30, ((newUnlock ? 260 : 200) - cheer) / 20);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, a);
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 8;
+    ctx.fillStyle = '#fff';
+    ctx.font = '800 24px system-ui, sans-serif';
+    ctx.fillText('ドッキング成功', W / 2, H * .27);
+    ctx.font = '600 13px system-ui, sans-serif';
+    ctx.fillStyle = '#9fd8ff';
+    ctx.fillText('ここから低重力ゾーン', W / 2, H * .27 + 24);
+    if (newUnlock) {
+      ctx.font = '800 17px system-ui, sans-serif';
+      ctx.fillStyle = 'hsl(' + ((frame * 5) % 360) + ',95%,70%)';
+      ctx.fillText('にじスライムが仲間になった！', W / 2, H * .27 + 56);
+    }
+    ctx.restore();
+  }
+
+  // ===== ループ =====
+  function step() {
+    if (invuln > 0) invuln--;
+    if (cheer > 0) {
+      cheer--;
+      if (cheer > 50 && cheer % 26 === 0) confetti(W / 2, camY + 70);
+    }
+    hm = Math.max(0, yToM(pl.y));
+    stepWind();
+
+    var mv = 0;
+    if (keys['ArrowLeft'] || keys['KeyA']) mv = -SL.speed;
+    if (keys['ArrowRight'] || keys['KeyD']) mv = SL.speed;
+    if (touchX !== null) {
+      var c = pl.x + pl.w / 2;
+      if (touchX < c - 8) mv = -SL.speed;
+      else if (touchX > c + 8) mv = SL.speed;
+    }
+    pl.x += mv + wind * 1.9 * SL.wind;
+
+    if (pl.kx !== 0) {
+      pl.x += pl.kx; pl.kx *= .88;
+      if (Math.abs(pl.kx) < .1) pl.kx = 0;
+    }
+    if (pl.x + pl.w < 0) pl.x = W;
+    if (pl.x > W) pl.x = -pl.w;
+
+    pl.vy += (pl.y < goalY ? LOWG : G) * SL.grav;
+    pl.y += pl.vy;
+    pl.sq *= .85;
+    if (pl.vy < -17) burst(pl.x + pl.w / 2, pl.y + pl.h, '#ff9a3d', 1);
+    if (SL.rainbow && frame % 2 === 0) {
+      parts.push({ x: pl.x + pl.w / 2 + rnd(-6, 6), y: pl.y + pl.h * .6,
+                   vx: rnd(-.4, .4), vy: rnd(.2, 1), life: .8,
+                   c: 'hsl(' + ((frame * 4) % 360) + ',95%,65%)', r: rnd(1.5, 3) });
+    }
+
+    if (pl.vy > 0) {
+      for (var i = 0; i < plats.length; i++) {
+        var p = plats[i];
+        if (p.dead) continue;
+        if (p.type === HOLO && !holoOn(p)) continue;
+        if (p.type === CLOUD && p.fading) continue;
+        if (p.type === CRUMBLE && p.fallT > 18) continue;
+        var foot = pl.y + pl.h, prev = foot - pl.vy;
+        if (pl.x + pl.w > p.x && pl.x < p.x + p.w && foot >= p.y && prev <= p.y) {
+          if (p.type === GLASS && p.crack) {
+            p.dead = true;
+            burst(p.x + p.w / 2, p.y, '#cfe6f7', 10);
+            continue;
+          }
+          pl.y = p.y - pl.h;
+          pl.sq = .55;
+          if (p.type === TRAMPO) { pl.vy = TF; pl.sq = .85; burst(pl.x + pl.w / 2, pl.y + pl.h, '#7ee08a', 7); }
+          else if (p.type === BOOST) { pl.vy = BF; pl.sq = .9; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffe08a', 14); }
+          else if (p.type === GLASS) { p.crack = true; pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, '#cfe6f7', 4); }
+          else if (p.type === CLOUD) { p.fading = true; pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffffff', 6); }
+          else if (p.type === CONVEYOR) { pl.vy = JMP; pl.kx = p.dir * 4.2; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffc861', 4); }
+          else if (p.type === CRUMBLE) { if (p.fallT === 0) p.fallT = 1; pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, '#c8a87a', 5); }
+          else if (p.type === STATION) {
+            pl.vy = JMP;
+            if (!goalGot) {
+              goalGot = true; cheer = 200; confetti(W / 2, p.y - 50);
+              if (!rainbowOpen) {
+                rainbowOpen = true; newUnlock = true; cheer = 260;
+                try { localStorage.setItem('skyHopRainbow', '1'); } catch (e) {}
+              }
+            }
+          } else { pl.vy = JMP; }
+        }
+      }
+    }
+
+    for (var j = 0; j < plats.length; j++) {
+      var q = plats[j];
+      if (q.dead) continue;
+      if (q.type === GONDOLA) {
+        q.x += q.dir * q.sp;
+        if (q.x < 0 || q.x + q.w > W) q.dir *= -1;
+      } else if (q.type === CLOUD && q.fading) {
+        q.ft++;
+        if (q.ft > 16) q.dead = true;
+      } else if (q.type === CRUMBLE && q.fallT > 0) {
+        q.fallT++;
+        if (q.fallT > 18) { q.fv += .45; q.y += q.fv; }
+        if (q.y > camY + H + 100) q.dead = true;
+      }
+    }
+
+    stepFoes();
+    stepPlanes();
+
+    var want = pl.y - H * .38;
+    if (want < camY) camY += (want - camY) * .11;
+    var cap = pl.y - H * .14;
+    if (cap < camY) camY = cap;
+
+    var cur = Math.floor(hm);
+    if (cur > score) { score = cur; elM.textContent = score; }
+
+    fillUpTo(camY - 120);
+    for (var k = plats.length - 1; k >= 0; k--) {
+      if (plats[k].y > camY + H + 140) plats.splice(k, 1);
+    }
+    stepParts();
+
+    if (pl.y - camY > H + 60) over();
+  }
+
+  function paint() {
+    ctx.clearRect(0, 0, W, H);
+    drawSky();
+    drawSun();
+    drawStars();
+    drawStationFar();
+    drawPlanes();
+    drawClouds();
+    drawCity();
+    for (var i = 0; i < plats.length; i++) drawPlat(plats[i]);
+    drawFoes();
+    drawParts();
+    drawPlayer();
+    drawWind();
+    drawCheer();
+  }
+
+  function loop() {
+    if (!run) return;
+    frame++;
+    step();
+    paint();
+    raf = requestAnimationFrame(loop);
+  }
+
+  // ===== 進行 =====
+  function start() {
+    fit(); initBg();
+    score = 0; camY = 0; frame = 0; hm = 0; invuln = 0;
+    parts = []; foes = []; plats = [];
+    droneT = 260; debrisT = 300; planeT = 180;
+    wind = 0; windTo = 0; windT = 260;
+    goalPut = false; goalGot = false; cheer = 0; newUnlock = false;
+    elM.textContent = '0';
+    groundY = H - 30;
+    goalY = mToY(GOAL_M);
+    var g = mk(0, groundY, BEAM, W);
+    g.h = 30; g.ground = true;
+    plats.push(g);
+    genY = groundY;
+    fillUpTo(-H * .6);
+    pl = newPlayer();
+    vStart.classList.remove('on');
+    vOver.classList.remove('on');
+    run = true;
+    if (raf) cancelAnimationFrame(raf);
+    loop();
+  }
+
+  function over() {
+    run = false;
+    saveBest();
+    elOM.textContent = score;
+    elNote.className = 'note';
+    if (newUnlock) {
+      elNote.textContent = 'にじスライム 解放！';
+      elNote.className = 'note gold';
+    } else {
+      elNote.textContent = goalGot
+        ? 'ステーション到達'
+        : (score >= best && score > 0 ? 'ベスト更新' : 'ベストまで あと ' + Math.max(1, best - score) + 'm');
+    }
+    vOver.classList.add('on');
+  }
+
+  // ===== 操作 =====
+  document.addEventListener('keydown', function (e) {
+    keys[e.code] = true;
+    if (e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'Space') e.preventDefault();
+  });
+  document.addEventListener('keyup', function (e) { keys[e.code] = false; });
+
+  function tx(e) {
+    var r = cv.getBoundingClientRect();
+    return e.touches[0].clientX - r.left;
+  }
+  fit();
+  cv.addEventListener('touchstart', function (e) { e.preventDefault(); touchX = tx(e); }, { passive: false });
+  cv.addEventListener('touchmove', function (e) { e.preventDefault(); touchX = tx(e); }, { passive: false });
+  cv.addEventListener('touchend', function (e) { e.preventDefault(); touchX = null; }, { passive: false });
+  cv.addEventListener('mousedown', function (e) {
+    var r = cv.getBoundingClientRect(); touchX = e.clientX - r.left;
+  });
+  cv.addEventListener('mousemove', function (e) {
+    if (touchX === null) return;
+    var r = cv.getBoundingClientRect(); touchX = e.clientX - r.left;
+  });
+  window.addEventListener('mouseup', function () { touchX = null; });
+
+  window.addEventListener('resize', function () {
+    var wasRun = run;
+    fit(); initBg();
+    if (!wasRun) title();
+  });
+
+  $('bStart').addEventListener('click', start);
+  $('bRetry').addEventListener('click', start);
+  $('bChange').addEventListener('click', function () {
+    vOver.classList.remove('on');
+    vStart.classList.add('on');
+    buildPicker();
+    title();
+  });
+
+  // ===== タイトルの絵 =====
+  function title() {
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, 'rgb(96,78,156)'); g.addColorStop(1, 'rgb(252,168,98)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#ffd98a';
+    ctx.beginPath(); ctx.arc(W * .24, H * .52, 30, 0, 6.2832); ctx.fill();
+    ctx.globalAlpha = .75; ctx.fillStyle = '#ffd2a6';
+    for (var i = 0; i < 5; i++) {
+      var cx = rnd(0, W), cy = rnd(H * .2, H * .62);
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 34, 12, 0, 0, 6.2832);
+      ctx.ellipse(cx + 22, cy + 4, 20, 9, 0, 0, 6.2832);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    var x = -20;
+    while (x < W + 20) {
+      var w = rnd(26, 58), h = rnd(70, 200);
+      ctx.fillStyle = '#2b2740';
+      ctx.fillRect(x, H - h, w, h);
+      x += w + rnd(3, 10);
+    }
+  }
+
+  loadBest();
+  applySlime();
+  buildPicker();
+  groundY = H - 30;
+  title();
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+}
+</script>
+</body>
+</html>
