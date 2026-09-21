@@ -811,9 +811,9 @@
     ctx.fillStyle = cF; ctx.fill();
     ctx.strokeStyle = cD; ctx.lineWidth = 1.6; ctx.stroke();
 
-    // おなかの明るいところ
+    // おなかの明るいところ(口と重ならない位置まで下げる)
     ctx.fillStyle = cB;
-    ctx.beginPath(); ctx.ellipse(cx, cy + ry * .34, rx * .55, ry * .34, 0, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx, cy + ry * .58, rx * .5, ry * .18, 0, 0, 6.2832); ctx.fill();
     // 光沢
     ctx.fillStyle = 'rgba(255,255,255,.88)';
     ctx.beginPath(); ctx.ellipse(cx - rx * .34, cy - ry * .44, rx * .2, ry * .13, -.5, 0, 6.2832); ctx.fill();
