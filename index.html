@@ -125,6 +125,54 @@
     -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 800;
   }
   .pinfo { font-size: 12.5px; line-height: 1.7; min-height: 3.4em; opacity: .85; margin-bottom: 14px; }
+
+  .coinbar { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 2px 0 10px; }
+  .coin-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.25);
+    border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .coin-pill.big-pill { font-size: 16px; padding: 7px 16px; margin: 2px 0 14px; }
+  .shopbtn { padding: 8px 16px; font-size: 12.5px; }
+
+  .shop-card { max-width: 340px; }
+  .shop-list {
+    display: flex; flex-direction: column; gap: 8px;
+    max-height: min(400px, 55vh); overflow-y: auto;
+    margin-bottom: 16px; text-align: left;
+  }
+  .shop-row {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+    border-radius: 12px; padding: 8px 10px;
+  }
+  .shop-thumb { width: 34px; height: 32px; flex: none; }
+  .shop-thumb.ticket-thumb {
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-size: 16px; background: rgba(255,255,255,.1); border: 2px dashed rgba(255,255,255,.3);
+  }
+  .shop-info { flex: 1; min-width: 0; }
+  .shop-name { font-size: 13px; font-weight: 700; }
+  .shop-desc { font-size: 11px; opacity: .75; line-height: 1.5; margin-top: 2px; }
+  .buybtn {
+    flex: none; font-size: 12px; padding: 8px 12px; border-radius: 10px;
+    box-shadow: none; background: linear-gradient(180deg, #7fdcff, var(--sky));
+  }
+  .buybtn:disabled { opacity: .35; cursor: not-allowed; box-shadow: none; }
+  .owned-tag { flex: none; font-size: 11px; opacity: .6; font-weight: 700; }
+
+  .ticket-toggle { font-size: 12px; margin: 2px 0 12px; opacity: .9; }
+  .ticket-toggle label { display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
+
+  .blob.shape-square { border-radius: 8px; }
+  .blob.shape-drop { border-radius: 50% 50% 50% 4px; transform: rotate(-45deg); }
+  .blob.shape-drop::after { transform: rotate(45deg); }
+  .blob.shape-star {
+    border-radius: 0; border-width: 0;
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  }
+  .oCoin { color: var(--lime); font-size: 13px; font-weight: 700; min-height: 1.2em; margin: -8px 0 10px; }
 </style>
 </head>
 <body>
@@ -142,8 +190,15 @@
       <div class="card">
         <h1>スカイホッパー</h1>
         <p>ビルの屋上から足場を乗り継いで、<br>夕焼けの雲をぬけて宇宙ステーションへ。</p>
+        <div class="coinbar">
+          <span class="coin-pill">🪙 <span id="coinCount">0</span></span>
+          <button class="ghost shopbtn" id="bShop">ショップ</button>
+        </div>
         <div class="picker" id="picker"></div>
         <div class="pinfo" id="pinfo"></div>
+        <div class="ticket-toggle" id="ticketToggle" style="display:none">
+          <label><input type="checkbox" id="ticketUse"> ブーストチケットを使う(残り <span id="ticketLeft">0</span>枚)</label>
+        </div>
         <button id="bStart">スタート</button>
       </div>
     </div>
@@ -152,6 +207,7 @@
       <div class="card">
         <h2>落下</h2>
         <div class="big"><span id="oM">0</span><span style="font-size:18px">m</span></div>
+        <div class="oCoin" id="oCoin"></div>
         <div class="note" id="oNote"></div>
         <button id="bRetry">もう一度</button>
         <div><button class="ghost" id="bChange">スライムを変える</button></div>
@@ -164,6 +220,15 @@
         <p>すこし休んでから、また跳ぼう。</p>
         <button id="bResume">つづける</button>
         <div><button class="ghost" id="bQuit">タイトルへ</button></div>
+      </div>
+    </div>
+
+    <div class="veil" id="vShop">
+      <div class="card shop-card">
+        <h2>ショップ</h2>
+        <div class="coin-pill big-pill">🪙 <span id="shopCoinCount">0</span></div>
+        <div class="shop-list" id="shopList"></div>
+        <button class="ghost" id="bShopClose">とじる</button>
       </div>
     </div>
   </div>
@@ -201,24 +266,35 @@
 
   // 性能は「ジャンプ 8.9 以上」を守る（それ未満だと届かない足場が出る）
   var SLIMES = [
-    { n: 'あお',   c: '#4ec8f0', d: '#2b9ac6', b: '#7fdcf7',
+    { key: 'ao', shape: 'circle', n: 'あお',   c: '#4ec8f0', d: '#2b9ac6', b: '#7fdcf7',
       jump: 9.5, speed: 5.0, grav: 1.0, wind: 1.0,
       t: 'バランス型。まずはこれで。' },
-    { n: 'みどり', c: '#63d98a', d: '#2f9e5c', b: '#93ecab',
+    { key: 'midori', shape: 'circle', n: 'みどり', c: '#63d98a', d: '#2f9e5c', b: '#93ecab',
       jump: 11.0, speed: 4.2, grav: 1.0, wind: 1.0,
       t: 'ばね体質。よく跳ねるかわり横移動がおそい。' },
-    { n: 'きいろ', c: '#f5cf4e', d: '#c79c1f', b: '#ffe58a',
+    { key: 'kiiro', shape: 'circle', n: 'きいろ', c: '#f5cf4e', d: '#c79c1f', b: '#ffe58a',
       jump: 8.9, speed: 6.3, grav: 1.0, wind: .45,
       t: 'すばやい。ビル風にも流されにくいが跳躍は低め。' },
-    { n: 'ピンク', c: '#f58fc0', d: '#c75b93', b: '#ffbcd9',
+    { key: 'pink', shape: 'circle', n: 'ピンク', c: '#f58fc0', d: '#c75b93', b: '#ffbcd9',
       jump: 9.2, speed: 4.9, grav: .82, wind: 1.3,
       t: 'ふわふわ。落ちるのがおそく空中で粘れるが風に弱い。' },
-    { n: 'にじ', rainbow: true, tough: true, c: '#fff', d: '#999', b: '#fff',
+    { key: 'niji', shape: 'circle', rainbow: true, tough: true, c: '#fff', d: '#999', b: '#fff',
       jump: 11.0, speed: 6.2, grav: .85, wind: .4,
-      t: '最強。高く跳ねて、速くて、ふわっと粘れて、風にも負けない。ぶつかってもほとんど弾かれない。' }
+      t: '最強。高く跳ねて、速くて、ふわっと粘れて、風にも負けない。ぶつかってもほとんど弾かれない。' },
+    { key: 'shizuku', shape: 'drop', n: 'しずく', price: 400, c: '#3dd6f5', d: '#1f9fc4', b: '#c9f6ff',
+      jump: 10.2, speed: 4.4, grav: 1.12, wind: .9,
+      t: 'しずく体質。おもみで速く落ちて、着地がすぐ安定する。' },
+    { key: 'shikaku', shape: 'square', n: 'しかく', price: 700, c: '#b7c3d6', d: '#7c8aa0', b: '#eef3fa',
+      jump: 9.6, speed: 5.2, grav: 1.0, wind: .55,
+      t: 'しかく体質。角がふんばって、ビル風にとても強い。' },
+    { key: 'hoshi', shape: 'star', n: 'ほし', price: 1300, c: '#ffd23d', d: '#d19b12', b: '#fff3b0',
+      jump: 10.8, speed: 5.8, grav: .92, wind: 1.35,
+      t: 'ほし体質。跳躍も速さも抜群だが、軽くて風にとても弱い。' }
   ];
+  var TICKET_PRICE = 250;
   var sel = 0, SL, JMP, TF, BF;
   var rainbowOpen = false, newUnlock = false;
+  var coins = 0, tickets = 0, owned = {}, ticketActive = false;
 
   var cv, ctx, W, H, dpr;
   var run = false, paused = false;
@@ -234,7 +310,7 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var elM = $('hM'), elBest = $('hBest'), elOM = $('oM'), elNote = $('oNote');
-  var vStart = $('vStart'), vOver = $('vOver'), vPause = $('vPause'), bPause = $('bPause');
+  var vStart = $('vStart'), vOver = $('vOver'), vPause = $('vPause'), vShop = $('vShop'), bPause = $('bPause');
 
   function rr(x, y, w, h, r) {
     ctx.beginPath();
@@ -257,37 +333,134 @@
     BF = BOOST_F * k;
   }
 
+  function isLocked(s) {
+    if (s.rainbow) return !rainbowOpen;
+    if (s.price) return !owned[s.key];
+    return false;
+  }
+
   function buildPicker() {
     var box = $('picker');
     box.innerHTML = '';
     for (var i = 0; i < SLIMES.length; i++) {
       (function (i) {
         var s2 = SLIMES[i];
-        var locked = s2.rainbow && !rainbowOpen;
+        var locked = isLocked(s2);
         var d = document.createElement('div');
         d.className = 'slot' + (i === sel ? ' on' : '') + (locked ? ' lock' : '');
-        if (locked) {
+        if (locked && s2.rainbow) {
           d.innerHTML = '<div class="blob lock">?</div><span>？？？</span>';
           d.addEventListener('click', function () {
             $('pinfo').textContent = 'ひみつのスライム。宇宙ステーションまで登ると仲間になる。';
           });
+        } else if (locked) {
+          d.innerHTML = '<div class="blob lock">🔒</div><span>' + s2.price + '</span>';
+          d.addEventListener('click', openShop);
         } else {
           var bg = s2.rainbow
             ? 'conic-gradient(#ff5a5a,#ffb14d,#ffe45a,#6ee07a,#4ec8f0,#7b7bff,#e07bff,#ff5a5a)'
             : s2.c;
-          d.innerHTML = '<div class="blob" style="background:' + bg + '"></div><span>' + s2.n + '</span>';
+          d.innerHTML = '<div class="blob shape-' + s2.shape + '" style="background:' + bg + '"></div><span>' + s2.n + '</span>';
           d.addEventListener('click', function () { pick(i); });
         }
         box.appendChild(d);
       })(i);
     }
     $('pinfo').textContent = SLIMES[sel].t;
+    renderCoinUI();
+    renderTicketToggle();
   }
   function pick(i) {
-    if (SLIMES[i].rainbow && !rainbowOpen) return;
+    if (isLocked(SLIMES[i])) return;
     sel = i;
     applySlime();
     try { localStorage.setItem('skyHopSlime', String(i)); } catch (e) {}
+    buildPicker();
+  }
+
+  function findSlime(key) {
+    for (var i = 0; i < SLIMES.length; i++) if (SLIMES[i].key === key) return SLIMES[i];
+    return null;
+  }
+  function saveCoins() { try { localStorage.setItem('skyHopCoins', String(coins)); } catch (e) {} }
+  function saveTickets() { try { localStorage.setItem('skyHopTickets', String(tickets)); } catch (e) {} }
+  function saveOwned() { try { localStorage.setItem('skyHopOwned', JSON.stringify(owned)); } catch (e) {} }
+  function addCoins(n) { coins += n; saveCoins(); renderCoinUI(); }
+  function renderCoinUI() {
+    var el = $('coinCount'); if (el) el.textContent = coins;
+    var el2 = $('shopCoinCount'); if (el2) el2.textContent = coins;
+  }
+  function renderTicketToggle() {
+    var box = $('ticketToggle');
+    if (!box) return;
+    if (tickets > 0) {
+      box.style.display = 'block';
+      $('ticketLeft').textContent = tickets;
+    } else {
+      box.style.display = 'none';
+      $('ticketUse').checked = false;
+    }
+  }
+  function buySlime(key) {
+    var s = findSlime(key);
+    if (!s || owned[s.key] || coins < s.price) return false;
+    coins -= s.price; owned[s.key] = true;
+    saveCoins(); saveOwned(); renderCoinUI();
+    return true;
+  }
+  function buyTicket() {
+    if (coins < TICKET_PRICE) return false;
+    coins -= TICKET_PRICE; tickets++;
+    saveCoins(); saveTickets(); renderCoinUI();
+    return true;
+  }
+  function buildShop() {
+    var list = $('shopList');
+    list.innerHTML = '';
+    for (var i = 0; i < SLIMES.length; i++) {
+      var s = SLIMES[i];
+      if (!s.price) continue;
+      var row = document.createElement('div');
+      row.className = 'shop-row';
+      var ownedFlag = !!owned[s.key];
+      row.innerHTML =
+        '<div class="shop-thumb blob shape-' + s.shape + '" style="background:' + s.c + '"></div>' +
+        '<div class="shop-info"><div class="shop-name">' + s.n + '</div>' +
+        '<div class="shop-desc">' + s.t + '</div></div>' +
+        (ownedFlag
+          ? '<span class="owned-tag">入手済み</span>'
+          : '<button class="buybtn" data-key="' + s.key + '"' + (coins < s.price ? ' disabled' : '') + '>' + s.price + '🪙</button>');
+      list.appendChild(row);
+    }
+    var trow = document.createElement('div');
+    trow.className = 'shop-row';
+    trow.innerHTML =
+      '<div class="shop-thumb ticket-thumb">🎫</div>' +
+      '<div class="shop-info"><div class="shop-name">ブーストチケット(所持 ' + tickets + '枚)</div>' +
+      '<div class="shop-desc">その回だけ、ジャンプ床とロケット床が出やすくなる。使い切り。</div></div>' +
+      '<button class="buybtn" id="buyTicket"' + (coins < TICKET_PRICE ? ' disabled' : '') + '>' + TICKET_PRICE + '🪙</button>';
+    list.appendChild(trow);
+
+    renderCoinUI();
+    var btns = list.querySelectorAll('.buybtn[data-key]');
+    for (var j = 0; j < btns.length; j++) {
+      btns[j].addEventListener('click', function () {
+        if (buySlime(this.getAttribute('data-key'))) { buildShop(); buildPicker(); }
+      });
+    }
+    var tb = $('buyTicket');
+    if (tb) tb.addEventListener('click', function () {
+      if (buyTicket()) buildShop();
+    });
+  }
+  function openShop() {
+    buildShop();
+    vStart.classList.remove('on');
+    vShop.classList.add('on');
+  }
+  function closeShop() {
+    vShop.classList.remove('on');
+    vStart.classList.add('on');
     buildPicker();
   }
 
@@ -295,10 +468,13 @@
     try {
       best = parseInt(localStorage.getItem('skyHopBest') || '0', 10) || 0;
       rainbowOpen = localStorage.getItem('skyHopRainbow') === '1';
+      coins = parseInt(localStorage.getItem('skyHopCoins') || '0', 10) || 0;
+      tickets = parseInt(localStorage.getItem('skyHopTickets') || '0', 10) || 0;
+      owned = JSON.parse(localStorage.getItem('skyHopOwned') || '{}') || {};
       var sv = parseInt(localStorage.getItem('skyHopSlime') || '0', 10);
       if (sv >= 0 && sv < SLIMES.length) sel = sv;
-      if (SLIMES[sel].rainbow && !rainbowOpen) sel = 0;
-    } catch (e) { best = 0; }
+      if (isLocked(SLIMES[sel])) sel = 0;
+    } catch (e) { best = 0; coins = 0; tickets = 0; owned = {}; }
     elBest.textContent = best;
   }
   function saveBest() {
@@ -506,6 +682,11 @@
   }
 
   function spineType(m) {
+    if (ticketActive && m >= 90) {
+      var rb = Math.random();
+      if (m >= 450 && rb < .22) return Math.random() < .5 ? TRAMPO : BOOST;
+      if (m < 450 && rb < .16) return TRAMPO;
+    }
     var r = Math.random();
     if (m < 90) return BEAM;
     if (m < 450) { if (r < .13) return GONDOLA; if (r < .23) return TRAMPO; if (r < .31) return CONVEYOR; return BEAM; }
@@ -771,6 +952,31 @@
   }
 
   // ===== プレイヤー =====
+  function bodyPath(shape, cx, cy, rx, ry) {
+    ctx.beginPath();
+    if (shape === 'square') {
+      rr(cx - rx, cy - ry, rx * 2, ry * 2, Math.min(rx, ry) * .42);
+    } else if (shape === 'drop') {
+      var tipY = cy - ry * 1.35;
+      ctx.moveTo(cx, tipY);
+      ctx.quadraticCurveTo(cx + rx * 1.05, cy - ry * .35, cx + rx, cy + ry * .15);
+      ctx.quadraticCurveTo(cx + rx, cy + ry, cx, cy + ry);
+      ctx.quadraticCurveTo(cx - rx, cy + ry, cx - rx, cy + ry * .15);
+      ctx.quadraticCurveTo(cx - rx * 1.05, cy - ry * .35, cx, tipY);
+      ctx.closePath();
+    } else if (shape === 'star') {
+      var spikes = 5;
+      for (var i = 0; i < spikes * 2; i++) {
+        var ang = (Math.PI / spikes) * i - Math.PI / 2;
+        var rad = (i % 2 === 0) ? 1.05 : .52;
+        var px = cx + Math.cos(ang) * rx * rad, py = cy + Math.sin(ang) * ry * rad;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+    } else {
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, 6.2832);
+    }
+  }
   function newPlayer() {
     return { x: W / 2 - 15, y: groundY - 26, w: 30, h: 26, vy: JMP, kx: 0, sq: 0 };
   }
@@ -791,9 +997,9 @@
     ctx.fillStyle = 'rgba(0,0,0,.2)';
     ctx.beginPath(); ctx.ellipse(cx, by + 2, rx * .85, 3, 0, 0, 6.2832); ctx.fill();
 
-    // まるい体
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, rx, ry, 0, 0, 6.2832);
+    // 体(スライムの形)
+    var shape = SL.shape || 'circle';
+    bodyPath(shape, cx, cy, rx, ry);
     var cF = SL.c, cD = SL.d, cB = SL.b;
     if (SL.rainbow) {
       var hue = (frame * 4) % 360;
@@ -806,7 +1012,7 @@
       ctx.fillStyle = 'hsl(' + ((hue + 180) % 360) + ',100%,75%)';
       ctx.beginPath(); ctx.ellipse(cx, cy, rx * 1.5, ry * 1.5, 0, 0, 6.2832); ctx.fill();
       ctx.restore();
-      ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, 6.2832);
+      bodyPath(shape, cx, cy, rx, ry);
     }
     ctx.fillStyle = cF; ctx.fill();
     ctx.strokeStyle = cD; ctx.lineWidth = 1.6; ctx.stroke();
@@ -1201,6 +1407,12 @@
 
   // ===== 進行 =====
   function start() {
+    ticketActive = false;
+    var tCheck = $('ticketUse');
+    if (tCheck && tCheck.checked && tickets > 0) {
+      tickets--; saveTickets(); ticketActive = true;
+    }
+    renderTicketToggle();
     fit(); initBg();
     score = 0; camY = 0; frame = 0; hm = 0; invuln = 0;
     parts = []; foes = []; plats = [];
@@ -1230,7 +1442,9 @@
     run = false;
     bPause.classList.remove('show');
     saveBest();
+    if (score > 0) addCoins(score);
     elOM.textContent = score;
+    $('oCoin').textContent = score > 0 ? ('+' + score + ' コイン') : '';
     elNote.className = 'note';
     if (newUnlock) {
       elNote.textContent = 'にじスライム 解放！';
@@ -1313,6 +1527,8 @@
   bPause.addEventListener('click', pause);
   $('bResume').addEventListener('click', resume);
   $('bQuit').addEventListener('click', quitToTitle);
+  $('bShop').addEventListener('click', openShop);
+  $('bShopClose').addEventListener('click', closeShop);
 
   // ===== タイトルの絵 =====
   function title() {
