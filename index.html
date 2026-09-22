@@ -172,6 +172,18 @@
     border-radius: 0; border-width: 0;
     clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
   }
+  .blob.shape-heart {
+    border-radius: 0; border-width: 0;
+    clip-path: path('M13,24 C2,17 0,8 5,4 C9,1 13,3 13,7 C13,3 17,1 21,4 C26,8 24,17 13,24 Z');
+  }
+  .blob.shape-diamond {
+    border-radius: 0; border-width: 0;
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  }
+  .blob.shape-gem {
+    border-radius: 0; border-width: 0;
+    clip-path: polygon(23% 0%, 77% 0%, 100% 38%, 50% 100%, 0% 38%);
+  }
   .oCoin { color: var(--lime); font-size: 13px; font-weight: 700; min-height: 1.2em; margin: -8px 0 10px; }
 </style>
 </head>
@@ -266,30 +278,42 @@
 
   // 性能は「ジャンプ 8.9 以上」を守る（それ未満だと届かない足場が出る）
   var SLIMES = [
-    { key: 'ao', shape: 'circle', n: 'あお',   c: '#4ec8f0', d: '#2b9ac6', b: '#7fdcf7',
+    { key: 'ao', shape: 'circle', n: 'あお',   c: '#4ec8f0', d: '#2b9ac6',
       jump: 9.5, speed: 5.0, grav: 1.0, wind: 1.0,
       t: 'バランス型。まずはこれで。' },
-    { key: 'midori', shape: 'circle', n: 'みどり', c: '#63d98a', d: '#2f9e5c', b: '#93ecab',
+    { key: 'midori', shape: 'circle', n: 'みどり', c: '#63d98a', d: '#2f9e5c',
       jump: 11.0, speed: 4.2, grav: 1.0, wind: 1.0,
       t: 'ばね体質。よく跳ねるかわり横移動がおそい。' },
-    { key: 'kiiro', shape: 'circle', n: 'きいろ', c: '#f5cf4e', d: '#c79c1f', b: '#ffe58a',
+    { key: 'kiiro', shape: 'circle', n: 'きいろ', c: '#f5cf4e', d: '#c79c1f',
       jump: 8.9, speed: 6.3, grav: 1.0, wind: .45,
       t: 'すばやい。ビル風にも流されにくいが跳躍は低め。' },
-    { key: 'pink', shape: 'circle', n: 'ピンク', c: '#f58fc0', d: '#c75b93', b: '#ffbcd9',
+    { key: 'pink', shape: 'circle', n: 'ピンク', c: '#f58fc0', d: '#c75b93',
       jump: 9.2, speed: 4.9, grav: .82, wind: 1.3,
       t: 'ふわふわ。落ちるのがおそく空中で粘れるが風に弱い。' },
-    { key: 'niji', shape: 'circle', rainbow: true, tough: true, c: '#fff', d: '#999', b: '#fff',
+    { key: 'niji', shape: 'circle', rainbow: true, tough: true, c: '#fff', d: '#999',
       jump: 11.0, speed: 6.2, grav: .85, wind: .4,
       t: '最強。高く跳ねて、速くて、ふわっと粘れて、風にも負けない。ぶつかってもほとんど弾かれない。' },
-    { key: 'shizuku', shape: 'drop', n: 'しずく', price: 400, c: '#3dd6f5', d: '#1f9fc4', b: '#c9f6ff',
+    { key: 'shizuku', shape: 'drop', n: 'しずく', price: 400, c: '#3dd6f5', d: '#1f9fc4',
       jump: 10.2, speed: 4.4, grav: 1.12, wind: .9,
       t: 'しずく体質。おもみで速く落ちて、着地がすぐ安定する。' },
-    { key: 'shikaku', shape: 'square', n: 'しかく', price: 700, c: '#b7c3d6', d: '#7c8aa0', b: '#eef3fa',
+    { key: 'shikaku', shape: 'square', n: 'しかく', price: 700, c: '#b7c3d6', d: '#7c8aa0',
       jump: 9.6, speed: 5.2, grav: 1.0, wind: .55,
       t: 'しかく体質。角がふんばって、ビル風にとても強い。' },
-    { key: 'hoshi', shape: 'star', n: 'ほし', price: 1300, c: '#ffd23d', d: '#d19b12', b: '#fff3b0',
+    { key: 'hoshi', shape: 'star', n: 'ほし', price: 1300, c: '#ffd23d', d: '#d19b12',
       jump: 10.8, speed: 5.8, grav: .92, wind: 1.35,
-      t: 'ほし体質。跳躍も速さも抜群だが、軽くて風にとても弱い。' }
+      t: 'ほし体質。跳躍も速さも抜群だが、軽くて風にとても弱い。' },
+    { key: 'hato', shape: 'heart', n: 'ハート', price: 2000, c: '#ff6b81', d: '#c93756',
+      jump: 9.8, speed: 5.6, grav: .9, wind: 1.1,
+      t: 'ハート体質。跳躍もすばやさもバランスよく高い、二段目の万能型。' },
+    { key: 'hishi', shape: 'diamond', n: 'ひし形', price: 1800, c: '#8fd8ff', d: '#4a9bcf',
+      jump: 9.3, speed: 6.6, grav: 1.05, wind: .5,
+      t: 'ひし形体質。とがった分すり抜けが速く、ビル風にもとても強い。' },
+    { key: 'kuro', shape: 'drop', n: 'よるしずく', price: 3200, c: '#3a3550', d: '#221f33',
+      jump: 11.2, speed: 5.0, grav: .88, wind: .85,
+      t: 'よるしずく体質。だれよりも高く跳べる、夜空に溶け込む色。' },
+    { key: 'gold', shape: 'gem', n: 'ゴールド', price: 6000, c: '#f0c987', d: '#b8873a',
+      jump: 11.2, speed: 6.0, grav: .88, wind: .5,
+      t: '超高級。宝石カットの体で、跳躍・速さ・粘り・風どれも一級品。値段だけの価値はある。' }
   ];
   var TICKET_PRICE = 250;
   var sel = 0, SL, JMP, TF, BF;
@@ -964,6 +988,24 @@
       ctx.quadraticCurveTo(cx - rx, cy + ry, cx - rx, cy + ry * .15);
       ctx.quadraticCurveTo(cx - rx * 1.05, cy - ry * .35, cx, tipY);
       ctx.closePath();
+    } else if (shape === 'heart') {
+      ctx.moveTo(cx, cy + ry * .78);
+      ctx.bezierCurveTo(cx - rx * 1.35, cy + ry * .05, cx - rx * .95, cy - ry * 1.15, cx, cy - ry * .35);
+      ctx.bezierCurveTo(cx + rx * .95, cy - ry * 1.15, cx + rx * 1.35, cy + ry * .05, cx, cy + ry * .78);
+      ctx.closePath();
+    } else if (shape === 'diamond') {
+      ctx.moveTo(cx, cy - ry * 1.15);
+      ctx.lineTo(cx + rx * 1.05, cy);
+      ctx.lineTo(cx, cy + ry * 1.15);
+      ctx.lineTo(cx - rx * 1.05, cy);
+      ctx.closePath();
+    } else if (shape === 'gem') {
+      ctx.moveTo(cx - rx * .55, cy - ry * 1.1);
+      ctx.lineTo(cx + rx * .55, cy - ry * 1.1);
+      ctx.lineTo(cx + rx * 1.1, cy - ry * .15);
+      ctx.lineTo(cx, cy + ry * 1.15);
+      ctx.lineTo(cx - rx * 1.1, cy - ry * .15);
+      ctx.closePath();
     } else if (shape === 'star') {
       var spikes = 5;
       for (var i = 0; i < spikes * 2; i++) {
@@ -1000,12 +1042,11 @@
     // 体(スライムの形)
     var shape = SL.shape || 'circle';
     bodyPath(shape, cx, cy, rx, ry);
-    var cF = SL.c, cD = SL.d, cB = SL.b;
+    var cF = SL.c, cD = SL.d;
     if (SL.rainbow) {
       var hue = (frame * 4) % 360;
       cF = 'hsl(' + hue + ',90%,62%)';
       cD = 'hsl(' + hue + ',75%,42%)';
-      cB = 'hsl(' + ((hue + 50) % 360) + ',95%,80%)';
       // うしろの光
       ctx.save();
       ctx.globalAlpha *= .35;
@@ -1017,9 +1058,6 @@
     ctx.fillStyle = cF; ctx.fill();
     ctx.strokeStyle = cD; ctx.lineWidth = 1.6; ctx.stroke();
 
-    // おなかの明るいところ(口と重ならない位置まで下げる)
-    ctx.fillStyle = cB;
-    ctx.beginPath(); ctx.ellipse(cx, cy + ry * .58, rx * .5, ry * .18, 0, 0, 6.2832); ctx.fill();
     // 光沢
     ctx.fillStyle = 'rgba(255,255,255,.88)';
     ctx.beginPath(); ctx.ellipse(cx - rx * .34, cy - ry * .44, rx * .2, ry * .13, -.5, 0, 6.2832); ctx.fill();
