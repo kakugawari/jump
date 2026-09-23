@@ -42,7 +42,7 @@
     max-width: min(100vw, calc(100dvh * 0.66));
     max-height: 100dvh; overflow: hidden;
   }
-  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
   .hud {
     position: absolute; top: 0; left: 0; right: 0;
@@ -73,10 +73,18 @@
   }
   .veil.on { display: flex; }
   .card { text-align: center; padding: 26px 22px; max-width: 320px; }
-  .card h1 {
-    margin: 0 0 8px; font-size: 38px; font-weight: 800; letter-spacing: -.02em;
-    background: linear-gradient(180deg, #fff, var(--sky));
-    -webkit-background-clip: text; background-clip: text; color: transparent;
+  .logo { position: relative; margin: 14px 0 4px; }
+  .logo h1 {
+    margin: 0 -16px; font-size: 36px; line-height: 1.1; color: #fff; white-space: nowrap;
+    font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", system-ui, sans-serif; font-weight: 800;
+    -webkit-text-stroke: 1.4px #fff;
+    text-shadow: 0 3px 0 #6f9fe0, 0 8px 18px rgba(20,40,100,.45);
+    transform: rotate(-5deg);
+  }
+  .logo svg { position: absolute; left: 50%; top: -22px; width: 150px; height: 34px; margin-left: -62px; overflow: visible; }
+  .tagline {
+    margin: 16px 0 12px; font-size: 14px; font-weight: 800; letter-spacing: .04em; color: #fff;
+    transform: rotate(-3deg); text-shadow: 0 2px 6px rgba(0,0,0,.45);
   }
   .card h2 { margin: 0 0 8px; font-size: 24px; font-weight: 800; }
   .card p { margin: 0 0 20px; font-size: 14px; line-height: 1.85; opacity: .82; }
@@ -95,34 +103,20 @@
     box-shadow: none; border: 1px solid rgba(255,255,255,.3);
     font-size: 13px; padding: 9px 20px; opacity: .85;
   }
-  .picker { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 4px 0 10px; }
+  .picker { display: flex; justify-content: center; gap: 6px; margin: 4px 0 10px; }
   .slot {
-    width: 50px; padding: 8px 0 7px; border-radius: 14px; cursor: pointer;
+    position: relative; width: 62px; padding: 5px 0 6px; border-radius: 16px; cursor: pointer;
     background: rgba(255,255,255,.07); border: 2px solid transparent;
-    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
   }
   .slot.on { border-color: #fff; background: rgba(255,255,255,.17); }
-  .blob {
-    width: 26px; height: 24px; border-radius: 50%;
-    border: 2px solid rgba(0,0,0,.28);
-    position: relative;
-  }
-  .blob::after {
-    content: ''; position: absolute; left: 5px; top: 4px;
-    width: 6px; height: 4px; border-radius: 50%;
-    background: rgba(255,255,255,.85);
-  }
-  .slot span { font-size: 10px; font-weight: 700; opacity: .9; }
-  .slot.lock { opacity: .6; }
-  .blob.lock {
-    background: #2a2840; display: flex; align-items: center; justify-content: center;
-    font-size: 13px; font-weight: 800; color: rgba(255,255,255,.55);
-    border-style: dashed; border-color: rgba(255,255,255,.3);
-  }
-  .blob.lock::after { display: none; }
-  .note.gold {
-    background: linear-gradient(90deg,#ff5a5a,#ffb14d,#ffe45a,#6ee07a,#4ec8f0,#7b7bff,#e07bff);
-    -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 800;
+  .slot span { font-size: 9.5px; font-weight: 700; opacity: .9; white-space: nowrap; }
+  /* 封じてある物は色を残したまま暗幕を一枚かける(filter で沈めると壊れて見える) */
+  .slot .seal {
+    position: absolute; inset: 0; border-radius: 14px;
+    background: rgba(8,12,34,.5); box-shadow: inset 0 0 0 1px rgba(255,255,255,.2);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    font-size: 11px; font-weight: 800;
   }
   .pinfo { font-size: 12.5px; line-height: 1.7; min-height: 3.4em; opacity: .85; margin-bottom: 14px; }
 
@@ -147,7 +141,7 @@
     background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
     border-radius: 12px; padding: 8px 10px;
   }
-  .shop-thumb { width: 34px; height: 32px; flex: none; }
+  .shop-thumb { width: 40px; height: 40px; flex: none; }
   .shop-thumb.ticket-thumb {
     border-radius: 8px; display: flex; align-items: center; justify-content: center;
     font-size: 16px; background: rgba(255,255,255,.1); border: 2px dashed rgba(255,255,255,.3);
@@ -165,25 +159,6 @@
   .ticket-toggle { font-size: 12px; margin: 2px 0 12px; opacity: .9; }
   .ticket-toggle label { display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
 
-  .blob.shape-square { border-radius: 8px; }
-  .blob.shape-drop { border-radius: 50% 50% 50% 4px; transform: rotate(-45deg); }
-  .blob.shape-drop::after { transform: rotate(45deg); }
-  .blob.shape-star {
-    border-radius: 0; border-width: 0;
-    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
-  }
-  .blob.shape-heart {
-    border-radius: 0; border-width: 0;
-    clip-path: path('M13,24 C2,17 0,8 5,4 C9,1 13,3 13,7 C13,3 17,1 21,4 C26,8 24,17 13,24 Z');
-  }
-  .blob.shape-diamond {
-    border-radius: 0; border-width: 0;
-    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-  }
-  .blob.shape-gem {
-    border-radius: 0; border-width: 0;
-    clip-path: polygon(23% 0%, 77% 0%, 100% 38%, 50% 100%, 0% 38%);
-  }
   .oCoin { color: var(--lime); font-size: 13px; font-weight: 700; min-height: 1.2em; margin: -8px 0 10px; }
 </style>
 </head>
@@ -200,7 +175,14 @@
 
     <div class="veil on" id="vStart">
       <div class="card">
-        <h1>スカイホッパー</h1>
+        <div class="logo">
+          <svg viewBox="0 0 150 34" aria-hidden="true">
+            <path d="M6 30 C 40 8, 90 4, 138 10" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>
+            <path d="M126 3 L 140 10 L 128 19" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <h1>スカイジャンパー</h1>
+        </div>
+        <div class="tagline">＼ いろんな個性で、もっと高く！ ／</div>
         <p>ビルの屋上から足場を乗り継いで、<br>夕焼けの雲をぬけて宇宙ステーションへ。</p>
         <div class="coinbar">
           <span class="coin-pill">🪙 <span id="coinCount">0</span></span>
@@ -222,7 +204,7 @@
         <div class="oCoin" id="oCoin"></div>
         <div class="note" id="oNote"></div>
         <button id="bRetry">もう一度</button>
-        <div><button class="ghost" id="bChange">スライムを変える</button></div>
+        <div><button class="ghost" id="bChange">キャラを変える</button></div>
       </div>
     </div>
 
@@ -277,47 +259,22 @@
   ];
 
   // 性能は「ジャンプ 8.9 以上」を守る（それ未満だと届かない足場が出る）
-  var SLIMES = [
-    { key: 'ao', shape: 'circle', n: 'あお',   c: '#4ec8f0', d: '#2b9ac6',
-      jump: 9.5, speed: 5.0, grav: 1.0, wind: 1.0,
-      t: 'バランス型。まずはこれで。' },
-    { key: 'midori', shape: 'circle', n: 'みどり', c: '#63d98a', d: '#2f9e5c',
-      jump: 11.0, speed: 4.2, grav: 1.0, wind: 1.0,
-      t: 'ばね体質。よく跳ねるかわり横移動がおそい。' },
-    { key: 'kiiro', shape: 'circle', n: 'きいろ', c: '#f5cf4e', d: '#c79c1f',
-      jump: 8.9, speed: 6.3, grav: 1.0, wind: .45,
-      t: 'すばやい。ビル風にも流されにくいが跳躍は低め。' },
-    { key: 'pink', shape: 'circle', n: 'ピンク', c: '#f58fc0', d: '#c75b93',
-      jump: 9.2, speed: 4.9, grav: .82, wind: 1.3,
-      t: 'ふわふわ。落ちるのがおそく空中で粘れるが風に弱い。' },
-    { key: 'niji', shape: 'circle', rainbow: true, tough: true, c: '#fff', d: '#999',
-      jump: 11.0, speed: 6.2, grav: .85, wind: .4,
-      t: '最強。高く跳ねて、速くて、ふわっと粘れて、風にも負けない。ぶつかってもほとんど弾かれない。' },
-    { key: 'shizuku', shape: 'drop', n: 'しずく', price: 400, c: '#3dd6f5', d: '#1f9fc4',
-      jump: 10.2, speed: 4.4, grav: 1.12, wind: .9,
-      t: 'しずく体質。おもみで速く落ちて、着地がすぐ安定する。' },
-    { key: 'shikaku', shape: 'square', n: 'しかく', price: 700, c: '#b7c3d6', d: '#7c8aa0',
-      jump: 9.6, speed: 5.2, grav: 1.0, wind: .55,
-      t: 'しかく体質。角がふんばって、ビル風にとても強い。' },
-    { key: 'hoshi', shape: 'star', n: 'ほし', price: 1300, c: '#ffd23d', d: '#d19b12',
-      jump: 10.8, speed: 5.8, grav: .92, wind: 1.35,
-      t: 'ほし体質。跳躍も速さも抜群だが、軽くて風にとても弱い。' },
-    { key: 'hato', shape: 'heart', n: 'ハート', price: 2000, c: '#ff6b81', d: '#c93756',
-      jump: 9.8, speed: 5.6, grav: .9, wind: 1.1,
-      t: 'ハート体質。跳躍もすばやさもバランスよく高い、二段目の万能型。' },
-    { key: 'hishi', shape: 'diamond', n: 'ひし形', price: 1800, c: '#8fd8ff', d: '#4a9bcf',
-      jump: 9.3, speed: 6.6, grav: 1.05, wind: .5,
-      t: 'ひし形体質。とがった分すり抜けが速く、ビル風にもとても強い。' },
-    { key: 'kuro', shape: 'drop', n: 'よるしずく', price: 3200, c: '#3a3550', d: '#221f33',
-      jump: 11.2, speed: 5.0, grav: .88, wind: .85,
-      t: 'よるしずく体質。だれよりも高く跳べる、夜空に溶け込む色。' },
-    { key: 'gold', shape: 'gem', n: 'ゴールド', price: 6000, c: '#f0c987', d: '#b8873a',
-      jump: 11.2, speed: 6.0, grav: .88, wind: .5,
-      t: '超高級。宝石カットの体で、跳躍・速さ・粘り・風どれも一級品。値段だけの価値はある。' }
+  var CHARS = [
+    { key: 'usagi', n: 'バネうさぎ', tag: 'ジャンプ特化',
+      jump: 11.2, speed: 4.6, grav: 1.0, wind: 1.0,
+      t: 'ぴょーん！と高く跳ぶのが得意！誰よりも高く、空を目指そう！' },
+    { key: 'kumo', n: 'わたぐも', tag: 'ふわふわ浮く',
+      jump: 9.4, speed: 4.9, grav: .78, wind: 1.25,
+      t: 'ふわふわと空中に浮かぶのが得意！ゆっくり降りて、のんびり登ろう。' },
+    { key: 'ninja', n: 'たまご忍者', tag: 'バランス型',
+      jump: 9.8, speed: 5.6, grav: 1.0, wind: .6,
+      t: 'どんな足場でもバランスをとるのが得意！安定して、着実に登ろう。' },
+    { key: 'king', n: 'スターキング', tag: '全部乗せ最強', price: 6000, coin: 1.5, tough: true,
+      jump: 11.2, speed: 6.2, grav: .82, wind: .45,
+      t: 'ジャンプも、浮遊も、報酬も全部できる！この子がいれば間違いない！(コイン1.5倍)' }
   ];
   var TICKET_PRICE = 250;
-  var sel = 0, SL, JMP, TF, BF;
-  var rainbowOpen = false, newUnlock = false;
+  var sel = 0, CH, JMP, TF, BF;
   var coins = 0, tickets = 0, owned = {}, ticketActive = false;
 
   var cv, ctx, W, H, dpr;
@@ -349,67 +306,74 @@
   function mToY(m) { return groundY - m * PXM; }
   function yToM(y) { return (groundY - y) / PXM; }
 
-  function applySlime() {
-    SL = SLIMES[sel];
-    JMP = -SL.jump;
-    var k = SL.jump / 9.5;
+  function applyChar() {
+    CH = CHARS[sel];
+    JMP = -CH.jump;
+    var k = CH.jump / 9.5;
     TF = TRAMPO_F * k;
     BF = BOOST_F * k;
   }
 
-  function isLocked(s) {
-    if (s.rainbow) return !rainbowOpen;
-    if (s.price) return !owned[s.key];
-    return false;
+  function isLocked(c) { return !!c.price && !owned[c.key]; }
+
+  // ピッカーやショップ用に、ゲーム中と同じ描き方で小さな絵を作る
+  function charThumb(c, size) {
+    var cvs = document.createElement('canvas');
+    var d = window.devicePixelRatio || 1;
+    cvs.width = cvs.height = Math.round(size * d);
+    cvs.style.width = cvs.style.height = size + 'px';
+    var g = cvs.getContext('2d');
+    g.scale(d, d);
+    var r = size * .2;
+    drawChar(g, c.key, size / 2, size * .9, r, r, 'normal', 0);
+    return cvs;
   }
 
   function buildPicker() {
     var box = $('picker');
     box.innerHTML = '';
-    for (var i = 0; i < SLIMES.length; i++) {
+    for (var i = 0; i < CHARS.length; i++) {
       (function (i) {
-        var s2 = SLIMES[i];
-        var locked = isLocked(s2);
+        var c = CHARS[i];
         var d = document.createElement('div');
-        d.className = 'slot' + (i === sel ? ' on' : '') + (locked ? ' lock' : '');
-        if (locked && s2.rainbow) {
-          d.innerHTML = '<div class="blob lock">?</div><span>？？？</span>';
-          d.addEventListener('click', function () {
-            $('pinfo').textContent = 'ひみつのスライム。宇宙ステーションまで登ると仲間になる。';
-          });
-        } else if (locked) {
-          d.innerHTML = '<div class="blob lock">🔒</div><span>' + s2.price + '</span>';
+        d.className = 'slot' + (i === sel ? ' on' : '');
+        d.appendChild(charThumb(c, 52));
+        var nm = document.createElement('span');
+        nm.textContent = c.n;
+        d.appendChild(nm);
+        if (isLocked(c)) {
+          var seal = document.createElement('div');
+          seal.className = 'seal';
+          seal.textContent = '🔒 ' + c.price;
+          d.appendChild(seal);
           d.addEventListener('click', openShop);
         } else {
-          var bg = s2.rainbow
-            ? 'conic-gradient(#ff5a5a,#ffb14d,#ffe45a,#6ee07a,#4ec8f0,#7b7bff,#e07bff,#ff5a5a)'
-            : s2.c;
-          d.innerHTML = '<div class="blob shape-' + s2.shape + '" style="background:' + bg + '"></div><span>' + s2.n + '</span>';
           d.addEventListener('click', function () { pick(i); });
         }
         box.appendChild(d);
       })(i);
     }
-    $('pinfo').textContent = SLIMES[sel].t;
+    $('pinfo').textContent = CHARS[sel].tag + '｜' + CHARS[sel].t;
     renderCoinUI();
     renderTicketToggle();
   }
   function pick(i) {
-    if (isLocked(SLIMES[i])) return;
+    if (isLocked(CHARS[i])) return;
     sel = i;
-    applySlime();
-    try { localStorage.setItem('skyHopSlime', String(i)); } catch (e) {}
+    applyChar();
+    try { localStorage.setItem('skyJumpChar', CHARS[i].key); } catch (e) {}
     buildPicker();
   }
 
-  function findSlime(key) {
-    for (var i = 0; i < SLIMES.length; i++) if (SLIMES[i].key === key) return SLIMES[i];
-    return null;
+  function findChar(key) {
+    for (var i = 0; i < CHARS.length; i++) if (CHARS[i].key === key) return i;
+    return -1;
   }
   function saveCoins() { try { localStorage.setItem('skyHopCoins', String(coins)); } catch (e) {} }
   function saveTickets() { try { localStorage.setItem('skyHopTickets', String(tickets)); } catch (e) {} }
   function saveOwned() { try { localStorage.setItem('skyHopOwned', JSON.stringify(owned)); } catch (e) {} }
   function addCoins(n) { coins += n; saveCoins(); renderCoinUI(); }
+  function runCoins() { return Math.floor(score * (CH.coin || 1)); }
   function renderCoinUI() {
     var el = $('coinCount'); if (el) el.textContent = coins;
     var el2 = $('shopCoinCount'); if (el2) el2.textContent = coins;
@@ -425,10 +389,12 @@
       $('ticketUse').checked = false;
     }
   }
-  function buySlime(key) {
-    var s = findSlime(key);
-    if (!s || owned[s.key] || coins < s.price) return false;
-    coins -= s.price; owned[s.key] = true;
+  function buyChar(key) {
+    var i = findChar(key);
+    if (i < 0) return false;
+    var c = CHARS[i];
+    if (!isLocked(c) || coins < c.price) return false;
+    coins -= c.price; owned[c.key] = true;
     saveCoins(); saveOwned(); renderCoinUI();
     return true;
   }
@@ -438,44 +404,53 @@
     saveCoins(); saveTickets(); renderCoinUI();
     return true;
   }
+  function shopRow(thumb, name, desc, right) {
+    var row = document.createElement('div');
+    row.className = 'shop-row';
+    thumb.classList.add('shop-thumb');
+    row.appendChild(thumb);
+    var info = document.createElement('div');
+    info.className = 'shop-info';
+    info.innerHTML = '<div class="shop-name"></div><div class="shop-desc"></div>';
+    info.firstChild.textContent = name;
+    info.lastChild.textContent = desc;
+    row.appendChild(info);
+    row.appendChild(right);
+    return row;
+  }
   function buildShop() {
     var list = $('shopList');
     list.innerHTML = '';
-    for (var i = 0; i < SLIMES.length; i++) {
-      var s = SLIMES[i];
-      if (!s.price) continue;
-      var row = document.createElement('div');
-      row.className = 'shop-row';
-      var ownedFlag = !!owned[s.key];
-      row.innerHTML =
-        '<div class="shop-thumb blob shape-' + s.shape + '" style="background:' + s.c + '"></div>' +
-        '<div class="shop-info"><div class="shop-name">' + s.n + '</div>' +
-        '<div class="shop-desc">' + s.t + '</div></div>' +
-        (ownedFlag
-          ? '<span class="owned-tag">入手済み</span>'
-          : '<button class="buybtn" data-key="' + s.key + '"' + (coins < s.price ? ' disabled' : '') + '>' + s.price + '🪙</button>');
-      list.appendChild(row);
+    for (var i = 0; i < CHARS.length; i++) {
+      var c = CHARS[i];
+      if (!c.price) continue;
+      var right;
+      if (isLocked(c)) {
+        right = document.createElement('button');
+        right.className = 'buybtn';
+        right.textContent = c.price + '🪙';
+        right.disabled = coins < c.price;
+        right.addEventListener('click', (function (key) {
+          return function () { if (buyChar(key)) { buildShop(); buildPicker(); } };
+        })(c.key));
+      } else {
+        right = document.createElement('span');
+        right.className = 'owned-tag';
+        right.textContent = '入手済み';
+      }
+      list.appendChild(shopRow(charThumb(c, 40), c.n + '(' + c.tag + ')', c.t, right));
     }
-    var trow = document.createElement('div');
-    trow.className = 'shop-row';
-    trow.innerHTML =
-      '<div class="shop-thumb ticket-thumb">🎫</div>' +
-      '<div class="shop-info"><div class="shop-name">ブーストチケット(所持 ' + tickets + '枚)</div>' +
-      '<div class="shop-desc">その回だけ、ジャンプ床とロケット床が出やすくなる。使い切り。</div></div>' +
-      '<button class="buybtn" id="buyTicket"' + (coins < TICKET_PRICE ? ' disabled' : '') + '>' + TICKET_PRICE + '🪙</button>';
-    list.appendChild(trow);
-
+    var tb = document.createElement('button');
+    tb.className = 'buybtn';
+    tb.textContent = TICKET_PRICE + '🪙';
+    tb.disabled = coins < TICKET_PRICE;
+    tb.addEventListener('click', function () { if (buyTicket()) buildShop(); });
+    var ticon = document.createElement('div');
+    ticon.className = 'ticket-thumb';
+    ticon.textContent = '🎫';
+    list.appendChild(shopRow(ticon, 'ブーストチケット(所持 ' + tickets + '枚)',
+      'その回だけ、ジャンプ床とロケット床が出やすくなる。使い切り。', tb));
     renderCoinUI();
-    var btns = list.querySelectorAll('.buybtn[data-key]');
-    for (var j = 0; j < btns.length; j++) {
-      btns[j].addEventListener('click', function () {
-        if (buySlime(this.getAttribute('data-key'))) { buildShop(); buildPicker(); }
-      });
-    }
-    var tb = $('buyTicket');
-    if (tb) tb.addEventListener('click', function () {
-      if (buyTicket()) buildShop();
-    });
   }
   function openShop() {
     buildShop();
@@ -491,13 +466,11 @@
   function loadBest() {
     try {
       best = parseInt(localStorage.getItem('skyHopBest') || '0', 10) || 0;
-      rainbowOpen = localStorage.getItem('skyHopRainbow') === '1';
       coins = parseInt(localStorage.getItem('skyHopCoins') || '0', 10) || 0;
       tickets = parseInt(localStorage.getItem('skyHopTickets') || '0', 10) || 0;
       owned = JSON.parse(localStorage.getItem('skyHopOwned') || '{}') || {};
-      var sv = parseInt(localStorage.getItem('skyHopSlime') || '0', 10);
-      if (sv >= 0 && sv < SLIMES.length) sel = sv;
-      if (isLocked(SLIMES[sel])) sel = 0;
+      var i = findChar(localStorage.getItem('skyJumpChar'));
+      if (i >= 0 && !isLocked(CHARS[i])) sel = i;
     } catch (e) { best = 0; coins = 0; tickets = 0; owned = {}; }
     elBest.textContent = best;
   }
@@ -989,112 +962,268 @@
   }
 
   // ===== プレイヤー =====
-  function bodyPath(shape, cx, cy, rx, ry) {
-    ctx.beginPath();
-    if (shape === 'square') {
-      rr(cx - rx, cy - ry, rx * 2, ry * 2, Math.min(rx, ry) * .42);
-    } else if (shape === 'drop') {
-      var tipY = cy - ry * 1.35;
-      ctx.moveTo(cx, tipY);
-      ctx.quadraticCurveTo(cx + rx * 1.05, cy - ry * .35, cx + rx, cy + ry * .15);
-      ctx.quadraticCurveTo(cx + rx, cy + ry, cx, cy + ry);
-      ctx.quadraticCurveTo(cx - rx, cy + ry, cx - rx, cy + ry * .15);
-      ctx.quadraticCurveTo(cx - rx * 1.05, cy - ry * .35, cx, tipY);
-      ctx.closePath();
-    } else if (shape === 'heart') {
-      ctx.moveTo(cx, cy + ry * .78);
-      ctx.bezierCurveTo(cx - rx * 1.35, cy + ry * .05, cx - rx * .95, cy - ry * 1.15, cx, cy - ry * .35);
-      ctx.bezierCurveTo(cx + rx * .95, cy - ry * 1.15, cx + rx * 1.35, cy + ry * .05, cx, cy + ry * .78);
-      ctx.closePath();
-    } else if (shape === 'diamond') {
-      ctx.moveTo(cx, cy - ry * 1.15);
-      ctx.lineTo(cx + rx * 1.05, cy);
-      ctx.lineTo(cx, cy + ry * 1.15);
-      ctx.lineTo(cx - rx * 1.05, cy);
-      ctx.closePath();
-    } else if (shape === 'gem') {
-      ctx.moveTo(cx - rx * .55, cy - ry * 1.1);
-      ctx.lineTo(cx + rx * .55, cy - ry * 1.1);
-      ctx.lineTo(cx + rx * 1.1, cy - ry * .15);
-      ctx.lineTo(cx, cy + ry * 1.15);
-      ctx.lineTo(cx - rx * 1.1, cy - ry * .15);
-      ctx.closePath();
-    } else if (shape === 'star') {
-      var spikes = 5;
-      for (var i = 0; i < spikes * 2; i++) {
-        var ang = (Math.PI / spikes) * i - Math.PI / 2;
-        var rad = (i % 2 === 0) ? 1.05 : .52;
-        var px = cx + Math.cos(ang) * rx * rad, py = cy + Math.sin(ang) * ry * rad;
-        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-      }
-      ctx.closePath();
+  // 4体とも「足もと by」を基準に描き、体の中心の高さを返す。s は体の半径15pxを1とした倍率
+  var INK = '#2a2433';
+  function ell(g, x, y, rx, ry, rot) {
+    g.beginPath();
+    g.ellipse(x, y, Math.max(.1, rx), Math.max(.1, ry), rot || 0, 0, 6.2832);
+  }
+  function gloss(g, x, y, s) {
+    g.fillStyle = 'rgba(255,255,255,.85)';
+    ell(g, x, y, 3 * s, 1.9 * s, -.5); g.fill();
+  }
+  // 顔は 通常 / ジャンプ(口を開ける) / 着地(>< の目) の3つ
+  function drawFace(g, x, y, s, st, brows) {
+    var ex = 5 * s;
+    if (st === 'land') {
+      g.strokeStyle = INK; g.lineWidth = 1.5 * s; g.lineCap = 'round'; g.lineJoin = 'round';
+      g.beginPath();
+      g.moveTo(x - ex - 1.8 * s, y - 2 * s); g.lineTo(x - ex + 1.6 * s, y); g.lineTo(x - ex - 1.8 * s, y + 2 * s);
+      g.moveTo(x + ex + 1.8 * s, y - 2 * s); g.lineTo(x + ex - 1.6 * s, y); g.lineTo(x + ex + 1.8 * s, y + 2 * s);
+      g.stroke();
     } else {
-      ctx.ellipse(cx, cy, rx, ry, 0, 0, 6.2832);
+      g.fillStyle = INK;
+      ell(g, x - ex, y, 2.2 * s, 2.9 * s); g.fill();
+      ell(g, x + ex, y, 2.2 * s, 2.9 * s); g.fill();
+      g.fillStyle = '#fff';
+      ell(g, x - ex + .8 * s, y - 1.1 * s, .9 * s, .9 * s); g.fill();
+      ell(g, x + ex + .8 * s, y - 1.1 * s, .9 * s, .9 * s); g.fill();
+    }
+    if (brows) {
+      g.strokeStyle = INK; g.lineWidth = 1.3 * s; g.lineCap = 'round';
+      g.beginPath();
+      g.moveTo(x - ex - 2.4 * s, y - 4.6 * s); g.lineTo(x - ex + 2 * s, y - 3.4 * s);
+      g.moveTo(x + ex + 2.4 * s, y - 4.6 * s); g.lineTo(x + ex - 2 * s, y - 3.4 * s);
+      g.stroke();
+    }
+    g.fillStyle = 'rgba(255,110,140,.42)';
+    ell(g, x - ex - 1.6 * s, y + 3.6 * s, 2.3 * s, 1.3 * s); g.fill();
+    ell(g, x + ex + 1.6 * s, y + 3.6 * s, 2.3 * s, 1.3 * s); g.fill();
+    var my = y + 3.4 * s;
+    if (st === 'normal') {
+      g.strokeStyle = INK; g.lineWidth = 1.2 * s; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(x - 2 * s, my); g.quadraticCurveTo(x, my + 2.2 * s, x + 2 * s, my); g.stroke();
+    } else {
+      g.fillStyle = '#7a2c3a';
+      g.beginPath(); g.moveTo(x - 2.6 * s, my - .3 * s);
+      g.quadraticCurveTo(x, my + 4.6 * s, x + 2.6 * s, my - .3 * s); g.closePath(); g.fill();
+      g.fillStyle = '#ff8a9a';
+      ell(g, x, my + 2 * s, 1.3 * s, .8 * s); g.fill();
     }
   }
+
+  // バネうさぎ: 長い耳と、ばねの足。着地で縮み、跳ぶと伸びる
+  function drawUsagi(g, cx, by, rx, ry, st, t) {
+    var s = (rx + ry) / 30;
+    var sh = (st === 'land' ? 3.5 : st === 'jump' ? 10 : 6.5) * s;
+    var cy = by - sh - ry;
+    g.strokeStyle = '#2f7fd6'; g.lineWidth = 1.5 * s;
+    for (var k = -1; k <= 1; k += 2) {
+      for (var j = 0; j < 4; j++) { ell(g, cx + k * 5 * s, by - sh * (j + .5) / 4, 3.4 * s, 1.2 * s); g.stroke(); }
+    }
+    for (var e = -1; e <= 1; e += 2) {
+      g.save();
+      g.translate(cx + e * 4.6 * s, cy - ry * .7);
+      g.rotate(e * (.2 + Math.sin(t * .12) * .04));
+      g.fillStyle = '#58b8f6'; g.strokeStyle = '#2b84cf'; g.lineWidth = 1.4 * s;
+      ell(g, 0, -8.5 * s, 4 * s, 10 * s); g.fill(); g.stroke();
+      g.fillStyle = '#ffb3c7';
+      ell(g, 0, -8 * s, 1.9 * s, 7 * s); g.fill();
+      g.restore();
+    }
+    g.fillStyle = '#58b8f6'; g.strokeStyle = '#2b84cf'; g.lineWidth = 1.6 * s;
+    ell(g, cx, cy, rx, ry); g.fill(); g.stroke();
+    ell(g, cx - rx * .95, cy + ry * .3, 2.6 * s, 3.2 * s, .5); g.fill(); g.stroke();
+    ell(g, cx + rx * .95, cy + ry * .3, 2.6 * s, 3.2 * s, -.5); g.fill(); g.stroke();
+    gloss(g, cx - rx * .42, cy - ry * .5, s);
+    drawFace(g, cx, cy - ry * .05, s, st);
+    return cy;
+  }
+
+  // わたぐも: もこもこの雲に虹。ふちを先に太く引き、上から白で塗ると外側だけが縁になる
+  var PUFFS = [[0, 0, .95], [-.6, .22, .6], [.6, .22, .6], [-.35, -.45, .58], [.32, -.5, .62], [-.95, .3, .42], [.95, .32, .42], [0, .45, .7]];
+  var RAINBOW = ['#ff6b6b', '#ffb14d', '#ffe45a', '#6ee07a', '#4ec8f0', '#9b7bff'];
+  function cloudPath(g, cx, cy, rx, ry) {
+    g.beginPath();
+    for (var i = 0; i < PUFFS.length; i++) {
+      var p = PUFFS[i], x = cx + p[0] * rx, y = cy + p[1] * ry;
+      g.moveTo(x + p[2] * rx, y);
+      g.ellipse(x, y, p[2] * rx, p[2] * ry, 0, 0, 6.2832);
+    }
+  }
+  function drawKumo(g, cx, by, rx, ry, st, t) {
+    var s = (rx + ry) / 30;
+    var w = rx * 1.2, cy = by - ry * 1.1 - 3 * s;
+    g.lineWidth = 1.8 * s; g.lineCap = 'butt';
+    for (var i = 0; i < RAINBOW.length; i++) {
+      g.strokeStyle = RAINBOW[i];
+      g.beginPath(); g.arc(cx + w * .35, cy - ry * .9, (13 - i * 1.6) * s, Math.PI, 0); g.stroke();
+    }
+    g.fillStyle = '#58b8f6';
+    ell(g, cx - 4.5 * s, by - .8 * s, 2.8 * s, 2.2 * s); g.fill();
+    ell(g, cx + 4.5 * s, by - .8 * s, 2.8 * s, 2.2 * s); g.fill();
+    cloudPath(g, cx, cy, w, ry);
+    g.strokeStyle = '#c7c0e8'; g.lineWidth = 3 * s; g.stroke();
+    g.fillStyle = '#fff'; g.fill();
+    g.save();
+    cloudPath(g, cx, cy, w, ry); g.clip();
+    var gr = g.createLinearGradient(0, cy - ry, 0, cy + ry * 1.2);
+    gr.addColorStop(.45, 'rgba(214,208,245,0)');
+    gr.addColorStop(1, 'rgba(214,208,245,.85)');
+    g.fillStyle = gr; g.fillRect(cx - w * 1.6, cy - ry * 1.6, w * 3.2, ry * 3.2);
+    g.restore();
+    drawFace(g, cx, cy + ry * .08, s, st);
+    return cy;
+  }
+
+  // たまご忍者: たまご形に緑のはちまきと帯。結び目の尾がなびく
+  function eggPath(g, cx, cy, rx, ry) {
+    g.beginPath();
+    g.moveTo(cx, cy - ry * 1.12);
+    g.bezierCurveTo(cx + rx * .82, cy - ry * 1.12, cx + rx * 1.05, cy - ry * .1, cx + rx, cy + ry * .3);
+    g.bezierCurveTo(cx + rx * .95, cy + ry * .92, cx + rx * .5, cy + ry, cx, cy + ry);
+    g.bezierCurveTo(cx - rx * .5, cy + ry, cx - rx * .95, cy + ry * .92, cx - rx, cy + ry * .3);
+    g.bezierCurveTo(cx - rx * 1.05, cy - ry * .1, cx - rx * .82, cy - ry * 1.12, cx, cy - ry * 1.12);
+    g.closePath();
+  }
+  function drawNinja(g, cx, by, rx, ry, st, t) {
+    var s = (rx + ry) / 30;
+    var cy = by - ry - 1.5 * s;
+    var kx = cx + rx * .85, ky = cy - ry * .6, fl = Math.sin(t * .25);
+    g.strokeStyle = '#3aa35b'; g.lineCap = 'round'; g.lineWidth = 2.6 * s;
+    g.beginPath(); g.moveTo(kx, ky); g.quadraticCurveTo(kx + 6 * s, ky - 3 * s + fl * 2 * s, kx + 11 * s, ky - s + fl * 3 * s); g.stroke();
+    g.beginPath(); g.moveTo(kx, ky); g.quadraticCurveTo(kx + 5 * s, ky + 3 * s - fl * 2 * s, kx + 9 * s, ky + 5 * s - fl * 2 * s); g.stroke();
+    g.fillStyle = '#2f6b3f';
+    ell(g, cx - 5 * s, by - 1.5 * s, 3 * s, 2 * s); g.fill();
+    ell(g, cx + 5 * s, by - 1.5 * s, 3 * s, 2 * s); g.fill();
+    eggPath(g, cx, cy, rx, ry);
+    g.fillStyle = '#fbf8ef'; g.fill();
+    g.save();
+    eggPath(g, cx, cy, rx, ry); g.clip();
+    var gr = g.createLinearGradient(0, cy - ry, 0, cy + ry);
+    gr.addColorStop(.5, 'rgba(235,224,196,0)'); gr.addColorStop(1, 'rgba(235,224,196,.9)');
+    g.fillStyle = gr; g.fillRect(cx - rx * 1.2, cy - ry * 1.2, rx * 2.4, ry * 2.4);
+    g.fillStyle = '#3aa35b';
+    g.fillRect(cx - rx * 1.2, cy - ry * .78, rx * 2.4, ry * .34);
+    g.fillRect(cx - rx * 1.2, cy + ry * .56, rx * 2.4, ry * .24);
+    g.fillStyle = '#2a7f45';
+    g.fillRect(cx - rx * 1.2, cy - ry * .47, rx * 2.4, ry * .05);
+    g.restore();
+    eggPath(g, cx, cy, rx, ry);
+    g.strokeStyle = '#cfc4a6'; g.lineWidth = 1.5 * s; g.stroke();
+    var ly = cy - ry * .61;
+    g.fillStyle = '#fff';
+    ell(g, cx, ly - .6 * s, .9 * s, 1.8 * s); g.fill();
+    ell(g, cx - 1.5 * s, ly + .2 * s, .8 * s, 1.5 * s, -.9); g.fill();
+    ell(g, cx + 1.5 * s, ly + .2 * s, .8 * s, 1.5 * s, .9); g.fill();
+    g.fillStyle = '#2f6b3f';
+    ell(g, cx - rx * .98, cy + ry * .25, 2.6 * s, 2.6 * s); g.fill();
+    ell(g, cx + rx * .98, cy + ry * .25, 2.6 * s, 2.6 * s); g.fill();
+    gloss(g, cx - rx * .45, cy - ry * .15, s * .8);
+    drawFace(g, cx, cy - ry * .05, s, st, true);
+    return cy;
+  }
+
+  // スターキング: 星の体に王冠・白い羽・赤いマント。まわりにきらめき
+  function starPath(g, cx, cy, R, k, inner) {
+    g.beginPath();
+    for (var i = 0; i < 10; i++) {
+      var a = Math.PI / 5 * i - Math.PI / 2, r = i % 2 ? R * inner : R;
+      var x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r * k;
+      if (i) g.lineTo(x, y); else g.moveTo(x, y);
+    }
+    g.closePath();
+  }
+  function twinkle(g, x, y, r, a) {
+    g.save();
+    g.globalAlpha *= a;
+    g.fillStyle = '#fff6b0';
+    g.beginPath();
+    g.moveTo(x, y - r * 2); g.quadraticCurveTo(x, y, x + r * 2, y); g.quadraticCurveTo(x, y, x, y + r * 2);
+    g.quadraticCurveTo(x, y, x - r * 2, y); g.quadraticCurveTo(x, y, x, y - r * 2);
+    g.fill();
+    g.restore();
+  }
+  function drawKing(g, cx, by, rx, ry, st, t) {
+    var s = (rx + ry) / 30;
+    var R = rx * 1.2, k = ry / rx;
+    var cy = by - R * k * .82;
+    var flap = Math.sin(t * (st === 'jump' ? .5 : .2)) * .25;
+    var wv = Math.sin(t * .2) * 2 * s;
+    g.fillStyle = '#e8403f'; g.strokeStyle = '#b52a2d'; g.lineWidth = 1.2 * s; g.lineJoin = 'round';
+    g.beginPath();
+    g.moveTo(cx - 5 * s, cy - 3 * s);
+    g.quadraticCurveTo(cx - 16 * s, cy + 4 * s, cx - 15 * s + wv, cy + 14 * s);
+    g.lineTo(cx - 4 * s + wv * .5, cy + 11 * s);
+    g.quadraticCurveTo(cx + 2 * s, cy + 4 * s, cx + 5 * s, cy - 3 * s);
+    g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#fff'; g.strokeStyle = '#c5d3e8'; g.lineWidth = 1.1 * s;
+    for (var e = -1; e <= 1; e += 2) {
+      g.save();
+      g.translate(cx + e * R * .5, cy - R * k * .3);
+      g.scale(e, 1);
+      for (var f = 2; f >= 0; f--) {
+        var a = -(.3 + f * .42) - flap, L = (9.5 - f * 1.5) * s;
+        ell(g, Math.cos(a) * L, Math.sin(a) * L, L, 3 * s, a); g.fill(); g.stroke();
+      }
+      g.restore();
+    }
+    starPath(g, cx, cy, R, k, .58);
+    g.strokeStyle = '#e8a317'; g.lineWidth = 3.2 * s; g.stroke();
+    g.fillStyle = '#ffd84a'; g.fill();
+    g.save();
+    starPath(g, cx, cy, R, k, .58); g.clip();
+    var gr = g.createRadialGradient(cx - 3 * s, cy - 4 * s, 1, cx, cy, R);
+    gr.addColorStop(0, 'rgba(255,250,200,.9)'); gr.addColorStop(1, 'rgba(255,200,40,0)');
+    g.fillStyle = gr; g.fillRect(cx - R, cy - R, R * 2, R * 2);
+    g.restore();
+    drawFace(g, cx, cy + 1.5 * s, s * .95, st);
+    g.save();
+    g.translate(cx, cy - R * k * .62);
+    g.rotate(-.08);
+    g.scale(1.15, 1.15);
+    g.fillStyle = '#d6353a'; ell(g, 0, -5 * s, 5 * s, 3.6 * s); g.fill();
+    g.fillStyle = '#ffcc33'; g.strokeStyle = '#c98b10'; g.lineWidth = s;
+    g.beginPath();
+    g.moveTo(-6.5 * s, 0); g.lineTo(-7 * s, -7 * s); g.lineTo(-3.5 * s, -3.5 * s); g.lineTo(0, -8.5 * s);
+    g.lineTo(3.5 * s, -3.5 * s); g.lineTo(7 * s, -7 * s); g.lineTo(6.5 * s, 0); g.closePath();
+    g.fill(); g.stroke();
+    g.fillStyle = '#e8a317'; g.fillRect(-6.5 * s, -2 * s, 13 * s, 2 * s);
+    g.fillStyle = '#e8403f'; ell(g, 0, -1.2 * s, 1.4 * s, 1.4 * s); g.fill();
+    g.fillStyle = '#fff';
+    ell(g, -7 * s, -7.4 * s, s, s); g.fill();
+    ell(g, 0, -9 * s, s, s); g.fill();
+    ell(g, 7 * s, -7.4 * s, s, s); g.fill();
+    g.restore();
+    for (var i = 0; i < 3; i++) {
+      var ph = t * .06 + i * 2.1, al = .5 + .5 * Math.sin(ph * 2.3);
+      twinkle(g, cx + Math.cos(ph) * R * 1.35, cy + Math.sin(ph) * R * 1.1, (1.2 + al * 1.3) * s, al);
+    }
+    return cy;
+  }
+
+  var DRAW = { usagi: drawUsagi, kumo: drawKumo, ninja: drawNinja, king: drawKing };
+  function drawChar(g, key, cx, by, rx, ry, st, t) { return DRAW[key](g, cx, by, rx, ry, st, t); }
+
   function newPlayer() {
-    return { x: W / 2 - 15, y: groundY - 26, w: 30, h: 26, vy: JMP, kx: 0, sq: 0 };
+    return { x: W / 2 - 15, y: groundY - 26, w: 30, h: 26, vy: JMP, kx: 0, sq: 0, landT: 0 };
   }
 
   function drawPlayer() {
-    var px = pl.x, py = pl.y - camY, w = pl.w, h = pl.h;
-    var st = Math.max(-1, Math.min(1, pl.vy / 13));
-    var stretch = pl.vy < 0 ? -st * .22 : st * .10;
-    var R = w * .5;
+    var v = Math.max(-1, Math.min(1, pl.vy / 13));
+    var stretch = pl.vy < 0 ? -v * .22 : v * .10;
+    var R = pl.w * .5;
     var wob = Math.sin(frame * .18) * (.8 + pl.sq * 2.2);
     var rx = R * (1 + pl.sq * .30 - stretch * .45) + wob;
     var ry = R * (1 - pl.sq * .26 + stretch) - wob;
-    var cx = px + w / 2, by = py + h, cy = by - ry;
+    var cx = pl.x + pl.w / 2, by = pl.y - camY + pl.h;
+    var st = pl.landT > 0 ? 'land' : (pl.vy < -3 ? 'jump' : 'normal');
 
     ctx.save();
     if (invuln > 0 && (invuln >> 2) % 2 === 0) ctx.globalAlpha = .45;
-
     ctx.fillStyle = 'rgba(0,0,0,.2)';
-    ctx.beginPath(); ctx.ellipse(cx, by + 2, rx * .85, 3, 0, 0, 6.2832); ctx.fill();
-
-    // 体(スライムの形)
-    var shape = SL.shape || 'circle';
-    bodyPath(shape, cx, cy, rx, ry);
-    var cF = SL.c, cD = SL.d;
-    if (SL.rainbow) {
-      var hue = (frame * 4) % 360;
-      cF = 'hsl(' + hue + ',90%,62%)';
-      cD = 'hsl(' + hue + ',75%,42%)';
-      // うしろの光
-      ctx.save();
-      ctx.globalAlpha *= .35;
-      ctx.fillStyle = 'hsl(' + ((hue + 180) % 360) + ',100%,75%)';
-      ctx.beginPath(); ctx.ellipse(cx, cy, rx * 1.5, ry * 1.5, 0, 0, 6.2832); ctx.fill();
-      ctx.restore();
-      bodyPath(shape, cx, cy, rx, ry);
-    }
-    ctx.fillStyle = cF; ctx.fill();
-    ctx.strokeStyle = cD; ctx.lineWidth = 1.6; ctx.stroke();
-
-    // 光沢
-    ctx.fillStyle = 'rgba(255,255,255,.88)';
-    ctx.beginPath(); ctx.ellipse(cx - rx * .34, cy - ry * .44, rx * .2, ry * .13, -.5, 0, 6.2832); ctx.fill();
-
-    // 目
-    var blink = (frame % 210) < 8;
-    var ey = cy - ry * .12, ex = rx * .34;
-    ctx.fillStyle = '#12314a';
-    if (blink) {
-      ctx.fillRect(cx - ex - 2.4, ey, 4.8, 1.6);
-      ctx.fillRect(cx + ex - 2.4, ey, 4.8, 1.6);
-    } else {
-      ctx.beginPath(); ctx.ellipse(cx - ex, ey, 2.4, 3.1, 0, 0, 6.2832); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(cx + ex, ey, 2.4, 3.1, 0, 0, 6.2832); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,.9)';
-      ctx.beginPath(); ctx.arc(cx - ex + .9, ey - 1.1, .9, 0, 6.2832); ctx.fill();
-      ctx.beginPath(); ctx.arc(cx + ex + .9, ey - 1.1, .9, 0, 6.2832); ctx.fill();
-    }
-    // 口
-    ctx.strokeStyle = 'rgba(18,49,74,.8)'; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
-    ctx.beginPath();
-    if (pl.vy < -6) { ctx.arc(cx, cy + ry * .22, 3.2, .15 * Math.PI, .85 * Math.PI); }
-    else { ctx.moveTo(cx - 3, cy + ry * .28); ctx.quadraticCurveTo(cx, cy + ry * .40, cx + 3, cy + ry * .28); }
-    ctx.stroke();
+    ell(ctx, cx, by + 2, rx * .85, 3); ctx.fill();
+    var cy = drawChar(ctx, CH.key, cx, by, rx, ry, st, frame);
 
     // 高いところではヘルメット
     if (hm >= 1400) {
@@ -1141,7 +1270,7 @@
   // ===== じゃまもの =====
   function knock(dx, down) {
     if (invuln > 0) return;
-    if (SL.tough) {
+    if (CH.tough) {
       invuln = 45;
       pl.kx = dx * 1.1;
       burst(pl.x + pl.w / 2, pl.y + pl.h / 2, '#ffffff', 10);
@@ -1303,7 +1432,7 @@
 
   function drawCheer() {
     if (cheer <= 0) return;
-    var a = Math.min(1, cheer / 30, ((newUnlock ? 260 : 200) - cheer) / 20);
+    var a = Math.min(1, cheer / 30, (200 - cheer) / 20);
     ctx.save();
     ctx.globalAlpha = Math.max(0, a);
     ctx.textAlign = 'center';
@@ -1314,11 +1443,6 @@
     ctx.font = '600 13px system-ui, sans-serif';
     ctx.fillStyle = '#9fd8ff';
     ctx.fillText('ここから低重力ゾーン', W / 2, H * .27 + 24);
-    if (newUnlock) {
-      ctx.font = '800 17px system-ui, sans-serif';
-      ctx.fillStyle = 'hsl(' + ((frame * 5) % 360) + ',95%,70%)';
-      ctx.fillText('にじスライムが仲間になった！', W / 2, H * .27 + 56);
-    }
     ctx.restore();
   }
 
@@ -1333,14 +1457,14 @@
     stepWind();
 
     var mv = 0;
-    if (keys['ArrowLeft'] || keys['KeyA']) mv = -SL.speed;
-    if (keys['ArrowRight'] || keys['KeyD']) mv = SL.speed;
+    if (keys['ArrowLeft'] || keys['KeyA']) mv = -CH.speed;
+    if (keys['ArrowRight'] || keys['KeyD']) mv = CH.speed;
     if (touchX !== null) {
       var c = pl.x + pl.w / 2;
-      if (touchX < c - 8) mv = -SL.speed;
-      else if (touchX > c + 8) mv = SL.speed;
+      if (touchX < c - 8) mv = -CH.speed;
+      else if (touchX > c + 8) mv = CH.speed;
     }
-    pl.x += mv + wind * 1.9 * SL.wind;
+    pl.x += mv + wind * 1.9 * CH.wind;
 
     if (pl.kx !== 0) {
       pl.x += pl.kx; pl.kx *= .88;
@@ -1349,14 +1473,14 @@
     if (pl.x + pl.w < 0) pl.x = W;
     if (pl.x > W) pl.x = -pl.w;
 
-    pl.vy += (pl.y < goalY ? LOWG : G) * SL.grav;
+    pl.vy += (pl.y < goalY ? LOWG : G) * CH.grav;
     pl.y += pl.vy;
     pl.sq *= .85;
     if (pl.vy < -17) burst(pl.x + pl.w / 2, pl.y + pl.h, '#ff9a3d', 1);
-    if (SL.rainbow && frame % 2 === 0) {
-      parts.push({ x: pl.x + pl.w / 2 + rnd(-6, 6), y: pl.y + pl.h * .6,
-                   vx: rnd(-.4, .4), vy: rnd(.2, 1), life: .8,
-                   c: 'hsl(' + ((frame * 4) % 360) + ',95%,65%)', r: rnd(1.5, 3) });
+    if (pl.landT > 0) pl.landT--;
+    if (CH.key === 'king' && frame % 3 === 0) {
+      parts.push({ x: pl.x + pl.w / 2 + rnd(-8, 8), y: pl.y + pl.h * .5,
+                   vx: rnd(-.4, .4), vy: rnd(.2, 1), life: .7, c: '#ffe27a', r: rnd(1.2, 2.4) });
     }
 
     if (pl.vy > 0) {
@@ -1375,6 +1499,7 @@
           }
           pl.y = p.y - pl.h;
           pl.sq = .55;
+          pl.landT = 9;
           if (p.type === TRAMPO) { pl.vy = TF; pl.sq = .85; burst(pl.x + pl.w / 2, pl.y + pl.h, '#7ee08a', 7); }
           else if (p.type === BOOST) { pl.vy = BF; pl.sq = .9; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffe08a', 14); }
           else if (p.type === GLASS) { p.crack = true; pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, '#cfe6f7', 4); }
@@ -1385,10 +1510,6 @@
             pl.vy = JMP;
             if (!goalGot) {
               goalGot = true; cheer = 200; confetti(W / 2, p.y - 50);
-              if (!rainbowOpen) {
-                rainbowOpen = true; newUnlock = true; cheer = 260;
-                try { localStorage.setItem('skyHopRainbow', '1'); } catch (e) {}
-              }
             }
           } else { pl.vy = JMP; }
         }
@@ -1486,7 +1607,7 @@
     parts = []; foes = []; plats = [];
     droneT = 260; debrisT = 300; planeT = 180;
     wind = 0; windTo = 0; windT = 260;
-    goalPut = false; goalGot = false; cheer = 0; newUnlock = false;
+    goalPut = false; goalGot = false; cheer = 0;
     elM.textContent = '0';
     groundY = H - 30;
     goalY = mToY(GOAL_M);
@@ -1509,18 +1630,13 @@
     run = false;
     bPause.classList.remove('show');
     saveBest();
-    if (score > 0) addCoins(score);
+    var got = runCoins();
+    if (got > 0) addCoins(got);
     elOM.textContent = score;
-    $('oCoin').textContent = score > 0 ? ('+' + score + ' コイン') : '';
-    elNote.className = 'note';
-    if (newUnlock) {
-      elNote.textContent = 'にじスライム 解放！';
-      elNote.className = 'note gold';
-    } else {
-      elNote.textContent = goalGot
-        ? 'ステーション到達'
-        : (score >= best && score > 0 ? 'ベスト更新' : 'ベストまで あと ' + Math.max(1, best - score) + 'm');
-    }
+    $('oCoin').textContent = got > 0 ? ('+' + got + ' コイン' + (CH.coin ? '(' + CH.coin + '倍)' : '')) : '';
+    elNote.textContent = goalGot
+      ? 'ステーション到達'
+      : (score >= best && score > 0 ? 'ベスト更新' : 'ベストまで あと ' + Math.max(1, best - score) + 'm');
     vOver.classList.add('on');
   }
 
@@ -1542,7 +1658,7 @@
     paused = false; run = false;
     if (raf) cancelAnimationFrame(raf);
     saveBest();
-    if (score > 0) addCoins(score);
+    if (runCoins() > 0) addCoins(runCoins());
     vPause.classList.remove('on');
     bPause.classList.remove('show');
     vOver.classList.remove('on');
@@ -1627,7 +1743,7 @@
   }
 
   loadBest();
-  applySlime();
+  applyChar();
   buildPicker();
   groundY = H - 30;
   title();
