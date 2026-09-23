@@ -30,18 +30,15 @@
   :root[data-theme="dark"] { --bg: var(--deep); }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  /* ホーム画面から開くと %・dvh は 873 しか渡らず下に帯が出る。根っこを 100vh(932)にすると渡る高さ自体が 932 になる */
   html, body {
-    margin: 0; padding: 0; height: 100%;
+    margin: 0; padding: 0; height: 100vh;
     background: var(--bg); overflow: hidden;
     font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
     color: var(--paper);
   }
-  #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
-  #board {
-    position: relative; width: 100%; height: 100%;
-    max-width: min(100vw, calc(100dvh * 0.66));
-    max-height: 100dvh; overflow: hidden;
-  }
+  #stage { position: absolute; inset: 0; }
+  #board { position: relative; width: 100%; height: 100%; overflow: hidden; }
   #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
   .hud {
@@ -159,6 +156,7 @@
   .ticket-toggle { font-size: 12px; margin: 2px 0 12px; opacity: .9; }
   .ticket-toggle label { display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
 
+  .ver { margin-top: 12px; font-size: 10px; opacity: .45; letter-spacing: .05em; }
   .oCoin { color: var(--lime); font-size: 13px; font-weight: 700; min-height: 1.2em; margin: -8px 0 10px; }
 </style>
 </head>
@@ -194,6 +192,7 @@
           <label><input type="checkbox" id="ticketUse"> ブーストチケットを使う(残り <span id="ticketLeft">0</span>枚)</label>
         </div>
         <button id="bStart">スタート</button>
+        <div class="ver">版 2026-09-24a</div>
       </div>
     </div>
 
