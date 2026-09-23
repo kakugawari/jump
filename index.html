@@ -205,7 +205,7 @@
         <div class="pinfo" id="pinfo"></div>
         <div class="item-toggles" id="itemToggles"></div>
         <button id="bStart">スタート</button>
-        <div class="ver">版 2026-09-24d</div>
+        <div class="ver">版 2026-09-24e</div>
       </div>
     </div>
 
@@ -295,15 +295,16 @@
   ];
   // 使い切りの品。rescue だけは「持っていく」で、助かった時にだけ減る
   var ITEMS = [
-    { id: 'ticket', n: 'ブーストチケット', icon: '🎫', price: 250, use: '使う',
+    { id: 'ticket', n: 'ブーストチケット', icon: '🎫', price: 1000, use: '使う',
       t: 'その回だけ、ジャンプ床とロケット床が出やすくなる。' },
-    { id: 'rocket', n: 'ロケットスタート', icon: '🚀', price: 500, use: '使う',
-      t: 'スタートと同時に 1000m まで一気に飛ぶ。飛んでいる間は何にも当たらない。' },
-    { id: 'rescue', n: '救出ばね', icon: '🌀', price: 300, use: '持っていく',
+    { id: 'rocket', n: 'ロケットスタート', icon: '🚀', price: 2000, use: '使う',
+      t: 'スタートと同時に 1000m まで一気に飛ぶ。飛んでいる間は何にも当たらない。飛んだぶんはコインにならない。' },
+    { id: 'rescue', n: '救出ばね', icon: '🌀', price: 1500, use: '持っていく',
       t: '落ちた時に1回だけ、ばねが出て助けてくれる。助かった時にだけ減る。' }
   ];
   var ROCKET_M = 1000;
-  var SKIN_PRICE = 1500, TRAIL_PRICE = 2000;
+  // 1回の収入(2000〜5000コインほど)から逆算し、全部集めるのに30〜60回かかる値段にしている
+  function skinPrice(key) { return key === 'king' ? 15000 : 8000; }
   // 色違い。0 番がもとの色
   var SKINS = {
     usagi: [
@@ -325,10 +326,10 @@
   };
   var TRAILS = [
     { id: 'none', n: 'なし' },
-    { id: 'star', n: '★ 星' },
-    { id: 'heart', n: '♥ ハート' },
-    { id: 'sakura', n: '🌸 桜' },
-    { id: 'rainbow', n: '🌈 虹' }
+    { id: 'star', n: '★ 星', price: 12000 },
+    { id: 'heart', n: '♥ ハート', price: 12000 },
+    { id: 'sakura', n: '🌸 桜', price: 12000 },
+    { id: 'rainbow', n: '🌈 虹', price: 20000 }
   ];
 
   // 区切り: 2000(宇宙ステーション) → 5000 → 10000 → 以降1万ごと
@@ -357,7 +358,7 @@
   var coins = 0, owned = {}, ticketActive = false;
   // stock: 使い切りの品の数 / equip: 付けている色と跡 / useSel: タイトルで付けたチェック
   var stock = { ticket: 0, rocket: 0, rescue: 0 }, equip = { skin: {}, trail: 'none' }, useSel = {};
-  var rocketOn = false, rescueArmed = false, pendingBuy = '';
+  var rocketOn = false, rocketUsed = false, rescueArmed = false, pendingBuy = '';
 
   var cv, ctx, W, H, dpr;
   var run = false, paused = false;
@@ -464,7 +465,8 @@
   function saveEquip() { try { localStorage.setItem('skyJumpEquip', JSON.stringify(equip)); } catch (e) {} }
   function saveOwned() { try { localStorage.setItem('skyHopOwned', JSON.stringify(owned)); } catch (e) {} }
   function addCoins(n) { coins += n; saveCoins(); renderCoinUI(); }
-  function runCoins() { return Math.floor(score * (CH.coin || 1)); }
+  // ロケットで飛んだぶんは数えない(数えると、使うたびに値段より多くのコインが入って得をする)
+  function runCoins() { return Math.floor(Math.max(0, score - (rocketUsed ? ROCKET_M : 0)) * (CH.coin || 1)); }
   function renderCoinUI() {
     var el = $('coinCount'); if (el) el.textContent = coins;
     var el2 = $('shopCoinCount'); if (el2) el2.textContent = coins;
@@ -552,7 +554,7 @@
       chips.className = 'chips';
       SKINS[c.key].forEach(function (sk, k) {
         var id = 'skin:' + c.key + ':' + k;
-        chips.appendChild(looksChip(id, sk.n, SKIN_PRICE, (equip.skin[c.key] || 0) === k, k === 0 || !!owned[id],
+        chips.appendChild(looksChip(id, sk.n, skinPrice(c.key), (equip.skin[c.key] || 0) === k, k === 0 || !!owned[id],
           function () { equip.skin[c.key] = k; saveEquip(); }));
       });
       info.appendChild(chips);
@@ -566,7 +568,7 @@
     tchips.className = 'chips';
     TRAILS.forEach(function (tr) {
       var id = 'trail:' + tr.id;
-      tchips.appendChild(looksChip(id, tr.n, TRAIL_PRICE, equip.trail === tr.id, tr.id === 'none' || !!owned[id],
+      tchips.appendChild(looksChip(id, tr.n, tr.price, equip.trail === tr.id, tr.id === 'none' || !!owned[id],
         function () { equip.trail = tr.id; saveEquip(); }));
     });
     trow.appendChild(tchips);
@@ -1895,7 +1897,8 @@
     // 使う品は開始時に1つ減らしてチェックを外す(「もう一度」で勝手に減らない)。救出ばねは助かった時だけ減る
     ticketActive = false; rocketOn = false;
     if (useSel.ticket && stock.ticket > 0) { stock.ticket--; ticketActive = true; useSel.ticket = false; }
-    if (useSel.rocket && stock.rocket > 0) { stock.rocket--; rocketOn = true; useSel.rocket = false; }
+    rocketUsed = false;
+    if (useSel.rocket && stock.rocket > 0) { stock.rocket--; rocketOn = rocketUsed = true; useSel.rocket = false; }
     rescueArmed = !!useSel.rescue && stock.rescue > 0;
     saveStock();
     renderItemToggles();
