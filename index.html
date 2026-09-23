@@ -156,6 +156,9 @@
   .ticket-toggle { font-size: 12px; margin: 2px 0 12px; opacity: .9; }
   .ticket-toggle label { display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
 
+  .titlebtn { margin: 0 0 10px; padding: 6px 14px; font-size: 12.5px; }
+  .titlebtn .tcount { opacity: .6; font-size: 11px; margin-left: 4px; }
+  .shop-row.off { opacity: .55; }
   .ver { margin-top: 12px; font-size: 10px; opacity: .45; letter-spacing: .05em; }
   .oCoin { color: var(--lime); font-size: 13px; font-weight: 700; min-height: 1.2em; margin: -8px 0 10px; }
 </style>
@@ -186,13 +189,15 @@
           <span class="coin-pill">🪙 <span id="coinCount">0</span></span>
           <button class="ghost shopbtn" id="bShop">ショップ</button>
         </div>
+        <button class="ghost titlebtn" id="bTitles">🏅 <span id="titleName">称号なし</span>
+          <span class="tcount" id="titleCount"></span></button>
         <div class="picker" id="picker"></div>
         <div class="pinfo" id="pinfo"></div>
         <div class="ticket-toggle" id="ticketToggle" style="display:none">
           <label><input type="checkbox" id="ticketUse"> ブーストチケットを使う(残り <span id="ticketLeft">0</span>枚)</label>
         </div>
         <button id="bStart">スタート</button>
-        <div class="ver">版 2026-09-24a</div>
+        <div class="ver">版 2026-09-24b</div>
       </div>
     </div>
 
@@ -213,6 +218,14 @@
         <p>すこし休んでから、また跳ぼう。</p>
         <button id="bResume">つづける</button>
         <div><button class="ghost" id="bQuit">タイトルへ</button></div>
+      </div>
+    </div>
+
+    <div class="veil" id="vTitles">
+      <div class="card shop-card">
+        <h2>称号</h2>
+        <div class="shop-list" id="titleList"></div>
+        <button class="ghost" id="bTitlesClose">とじる</button>
       </div>
     </div>
 
@@ -247,7 +260,7 @@
 
   var BEAM = 0, GONDOLA = 1, TRAMPO = 2, BOOST = 3,
       GLASS = 4, CLOUD = 5, HOLO = 6, STATION = 7,
-      CONVEYOR = 8, CRUMBLE = 9;
+      CONVEYOR = 8, CRUMBLE = 9, MILE = 10;
 
   var SKY = [
     { m: 0,    t: [96, 78, 156],  b: [252, 168, 98] },
@@ -273,6 +286,29 @@
       t: 'ジャンプも、浮遊も、報酬も全部できる！この子がいれば間違いない！(コイン1.5倍)' }
   ];
   var TICKET_PRICE = 250;
+
+  // 区切り: 2000(宇宙ステーション) → 5000 → 10000 → 以降1万ごと
+  function mileAt(i) { return i === 0 ? GOAL_M : i === 1 ? 5000 : 10000 * (i - 1); }
+  var MILE_NAMES = ['宇宙ステーション', '月面基地', '星の港', '銀河ゲート'];
+  function mileName(i) { return MILE_NAMES[Math.min(i, MILE_NAMES.length - 1)]; }
+  // 2000m より上は区切りを越えるたびに一段むずかしく。足場の間隔は変えないので必ず登れる
+  var MAX_LV = 5;
+  function zoneLv(m) { var L = 0; while (L < MAX_LV && m >= mileAt(L + 1)) L++; return L; }
+
+  var TITLES = [
+    { id: 'h500', n: 'ビルの上の新人', m: 500 },
+    { id: 'h1000', n: '夕焼けを越えた者', m: 1000 },
+    { id: 'h2000', n: '宇宙飛行士', m: 2000 },
+    { id: 'h5000', n: '月面の旅人', m: 5000 },
+    { id: 'h10000', n: '星の開拓者', m: 10000 },
+    { id: 'h20000', n: '銀河の旅人', m: 20000 },
+    { id: 'h30000', n: '銀河の覇者', m: 30000 },
+    { id: 'h50000', n: '伝説のジャンパー', m: 50000 },
+    { id: 'c_usagi', n: 'ばねの達人', m: 2000, ch: 'usagi' },
+    { id: 'c_kumo', n: 'ふわふわ名人', m: 2000, ch: 'kumo' },
+    { id: 'c_ninja', n: '天空の忍', m: 2000, ch: 'ninja' },
+    { id: 'c_king', n: '真の王', m: 2000, ch: 'king' }
+  ];
   var sel = 0, CH, JMP, TF, BF;
   var coins = 0, tickets = 0, owned = {}, ticketActive = false;
 
@@ -281,7 +317,10 @@
   var score = 0, best = 0;
   var pl, plats, parts, foes, clouds, stars, city, planes;
   var camY = 0, groundY = 0, goalY = 0, genY = 0;
-  var goalPut = false, goalGot = false, cheer = 0;
+  var goalGot = false, cheer = 0, cheerMi = 0, topMile = -1;
+  var mileIdx = 0, mileY = 0, lv = 0;
+  // 称号は記録(ベスト)とは別に持つ。記録を消しても閉じない
+  var titles = {}, runTitles = [], toastQ = [], toastName = '', toastT = 0;
   var keys = {}, touchX = null;
   var frame = 0, hm = 0, invuln = 0;
   var droneT = 0, debrisT = 0, planeT = 0;
@@ -290,7 +329,7 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var elM = $('hM'), elBest = $('hBest'), elOM = $('oM'), elNote = $('oNote');
-  var vStart = $('vStart'), vOver = $('vOver'), vPause = $('vPause'), vShop = $('vShop'), bPause = $('bPause');
+  var vStart = $('vStart'), vOver = $('vOver'), vPause = $('vPause'), vShop = $('vShop'), vTitles = $('vTitles'), bPause = $('bPause');
 
   function rr(x, y, w, h, r) {
     ctx.beginPath();
@@ -355,6 +394,7 @@
     $('pinfo').textContent = CHARS[sel].tag + '｜' + CHARS[sel].t;
     renderCoinUI();
     renderTicketToggle();
+    renderTitleUI();
   }
   function pick(i) {
     if (isLocked(CHARS[i])) return;
@@ -462,6 +502,47 @@
     buildPicker();
   }
 
+  function saveTitles() { try { localStorage.setItem('skyJumpTitles', JSON.stringify(titles)); } catch (e) {} }
+  function checkTitles() {
+    var got = false;
+    for (var i = 0; i < TITLES.length; i++) {
+      var t = TITLES[i];
+      if (titles[t.id] || score < t.m || (t.ch && t.ch !== CH.key)) continue;
+      titles[t.id] = true; runTitles.push(t.n); toastQ.push(t.n); got = true;
+    }
+    if (got) saveTitles();
+  }
+  function titleHow(t) { return (t.ch ? CHARS[findChar(t.ch)].n + 'で ' : '') + t.m + 'm に到達'; }
+  function renderTitleUI() {
+    var top = null, n = 0;
+    for (var i = 0; i < TITLES.length; i++) {
+      var t = TITLES[i];
+      if (!titles[t.id]) continue;
+      n++;
+      if (!t.ch && (!top || t.m > top.m)) top = t;
+    }
+    $('titleName').textContent = top ? top.n : '称号なし';
+    $('titleCount').textContent = n + '/' + TITLES.length;
+  }
+  function buildTitles() {
+    var list = $('titleList');
+    list.innerHTML = '';
+    for (var i = 0; i < TITLES.length; i++) {
+      var t = TITLES[i], on = !!titles[t.id];
+      var icon = document.createElement('div');
+      icon.className = 'ticket-thumb';
+      icon.textContent = on ? '🏅' : '？';
+      var tag = document.createElement('span');
+      tag.className = 'owned-tag';
+      tag.textContent = on ? '獲得' : '未獲得';
+      var row = shopRow(icon, on ? t.n : '？？？', titleHow(t), tag);
+      if (!on) row.classList.add('off');
+      list.appendChild(row);
+    }
+  }
+  function openTitles() { buildTitles(); vStart.classList.remove('on'); vTitles.classList.add('on'); }
+  function closeTitles() { vTitles.classList.remove('on'); vStart.classList.add('on'); }
+
   function loadBest() {
     try {
       best = parseInt(localStorage.getItem('skyHopBest') || '0', 10) || 0;
@@ -470,7 +551,13 @@
       owned = JSON.parse(localStorage.getItem('skyHopOwned') || '{}') || {};
       var i = findChar(localStorage.getItem('skyJumpChar'));
       if (i >= 0 && !isLocked(CHARS[i])) sel = i;
-    } catch (e) { best = 0; coins = 0; tickets = 0; owned = {}; }
+      titles = JSON.parse(localStorage.getItem('skyJumpTitles') || '{}') || {};
+    } catch (e) { best = 0; coins = 0; tickets = 0; owned = {}; titles = {}; }
+    // 称号ができる前に届いていた高さのぶんは、ベストの記録から渡す(キャラ別は記録が無いので渡せない)
+    for (var k = 0; k < TITLES.length; k++) {
+      if (!TITLES[k].ch && best >= TITLES[k].m) titles[TITLES[k].id] = true;
+    }
+    saveTitles();
     elBest.textContent = best;
   }
   function saveBest() {
@@ -734,27 +821,79 @@
   function fillUpTo(topY) {
     var base = W * PW;
     while (genY > topY) {
-      if (!goalPut && genY - goalY <= SAFE_GAP) {
-        var st = mk(0, goalY, STATION, W);
-        st.h = 18; plats.push(st);
-        goalPut = true; genY = goalY; continue;
+      // 区切りのブロックは、直前の足場から届く間隔に置く
+      if (genY - mileY <= (genY < goalY ? SAFE_GAP_LOW : SAFE_GAP)) {
+        var st = mk(0, mileY, mileIdx === 0 ? STATION : MILE, W);
+        st.h = 18; st.mi = mileIdx; plats.push(st);
+        genY = mileY;
+        mileIdx++; mileY = mToY(mileAt(mileIdx));
+        continue;
       }
       var g = gap(yToM(genY), genY);
       var ny = genY - g;
-      if (!goalPut && ny < goalY + 80) ny = goalY + 80;
+      if (ny < mileY + 80) ny = mileY + 80;
 
-      var m = yToM(ny);
+      var m = yToM(ny), L = zoneLv(m), thin = 1 - .07 * L;
       var t = spineType(m);
-      var w = base * wmul(m, t);
-      plats.push(mk(rnd(0, W - w), ny, t, w));
+      var w = base * wmul(m, t) * thin;
+      var sp = mk(rnd(0, W - w), ny, t, w);
+      sp.sp *= 1 + .15 * L;
+      plats.push(sp);
 
       if (g > 54 && Math.random() < (m < 300 ? .25 : .52)) {
         var bt = bonusType(m);
-        var bw = base * wmul(m, bt) * .88;
+        var bw = base * wmul(m, bt) * .88 * thin;
         plats.push(mk(rnd(0, W - bw), ny + g * (.35 + Math.random() * .3), bt, bw));
       }
       genY = ny;
     }
+  }
+
+  // 5000m 月面基地 / 10000m 星の港 / 20000m〜 銀河ゲート
+  function drawMile(p, y) {
+    var th = Math.min(p.mi, 3);
+    var C = [null,
+      { base: '#c9ccd6', top: '#eef0f5', mark: '#a3a8b8' },
+      { base: '#26306e', top: '#ffd84a', mark: '#ffe89a' },
+      { base: '#4b2f8f', top: '#c9a6ff', mark: '#e6d6ff' }][th];
+    ctx.save();
+    ctx.fillStyle = C.base; ctx.fillRect(0, y, W, p.h + 70);
+    ctx.fillStyle = C.top; ctx.fillRect(0, y, W, 5);
+    var i;
+    if (th === 1) {
+      ctx.fillStyle = C.mark;
+      for (i = 0; i < 7; i++) {
+        ctx.beginPath(); ctx.ellipse((i * 83) % (W - 30) + 15, y + 22 + (i % 3) * 14, 9 - (i % 3) * 2, 4, 0, 0, 6.2832); ctx.fill();
+      }
+      ctx.fillStyle = 'rgba(180,220,255,.55)';
+      ctx.beginPath(); ctx.arc(W * .8, y, 22, Math.PI, 0); ctx.fill();
+      ctx.strokeStyle = '#eef0f5'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(W * .16, y); ctx.lineTo(W * .16, y - 30); ctx.stroke();
+      ctx.fillStyle = '#e8403f'; ctx.fillRect(W * .16, y - 30, 16, 10);
+    } else if (th === 2) {
+      for (i = 0; i * 26 < W; i++) {
+        var on = (frame + i * 7) % 40 < 20;
+        ctx.fillStyle = on ? C.mark : 'rgba(255,232,154,.3)';
+        ctx.beginPath(); ctx.arc(13 + i * 26, y + 14, 2.5, 0, 6.2832); ctx.fill();
+      }
+    } else {
+      for (i = 0; i < RAINBOW.length; i++) {
+        ctx.fillStyle = RAINBOW[i]; ctx.globalAlpha = .75;
+        ctx.fillRect(0, y + 8 + i * 4, W, 4);
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.textAlign = 'center';
+    ctx.font = '800 20px system-ui, sans-serif';
+    ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 6;
+    ctx.fillStyle = '#fff';
+    ctx.fillText(mileAt(p.mi) + 'm  ' + mileName(p.mi), W / 2, y + 56);
+    if (p.got) {
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = (frame % 50 < 25) ? '#7ee08a' : 'rgba(126,224,138,.3)';
+      ctx.beginPath(); ctx.arc(W * .5, y - 8, 4, 0, 6.2832); ctx.fill();
+    }
+    ctx.restore();
   }
 
   function holoOn(p) { return (frame + ((p.ph * 31) | 0)) % 165 < 98; }
@@ -765,6 +904,8 @@
     if (p.ground) return;
     var x = p.x;
     if (p.type === GLASS && p.crack) { x += rnd(-1.5, 1.5); y += rnd(-1, 1); }
+
+    if (p.type === MILE) { drawMile(p, y); return; }
 
     // 宇宙ステーション（ゴール足場）
     if (p.type === STATION) {
@@ -784,7 +925,7 @@
         var sx2 = W * .6 + (W * .34) * s2 / 7;
         ctx.beginPath(); ctx.moveTo(sx2, y + 40); ctx.lineTo(sx2, y + 62); ctx.stroke();
       }
-      if (goalGot) {
+      if (p.got) {
         ctx.fillStyle = (frame % 50 < 25) ? '#7ee08a' : 'rgba(126,224,138,.3)';
         ctx.beginPath(); ctx.arc(W * .5, y - 8, 4, 0, 6.2832); ctx.fill();
       }
@@ -1296,7 +1437,7 @@
         droneT = rnd(200, 420);
       }
       if (hm > 950 && --debrisT <= 0) {
-        if (countFoe('debris') < 3) {
+        if (countFoe('debris') < Math.min(3 + lv, 6)) {
           var y0 = camY - 50, x0 = rnd(0, W), vy = rnd(5.5, 8);
           var tx2 = pl.x + pl.w / 2 + rnd(-90, 90);
           var fr = Math.max((pl.y - y0) / vy, 1);
@@ -1304,7 +1445,7 @@
                       vx: Math.max(-4.5, Math.min(4.5, (tx2 - x0) / fr)), vy: vy,
                       rot: rnd(0, 6.28), rv: rnd(-.12, .12) });
         }
-        debrisT = rnd(170, 330);
+        debrisT = rnd(170, 330) / (1 + .25 * lv);
       }
     }
     for (var i = foes.length - 1; i >= 0; i--) {
@@ -1409,7 +1550,7 @@
     if (hm < 200) { wind = 0; windTo = 0; return; }
     if (--windT <= 0) {
       if (Math.abs(windTo) > .05) { windTo = 0; windT = rnd(240, 460); }
-      else { windTo = (Math.random() < .5 ? -1 : 1) * rnd(.5, 1.05); windT = rnd(220, 380); }
+      else { windTo = (Math.random() < .5 ? -1 : 1) * rnd(.5, 1.05) * (1 + .1 * lv); windT = rnd(220, 380); }
     }
     wind += (windTo - wind) * .02;
   }
@@ -1438,10 +1579,27 @@
     ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 8;
     ctx.fillStyle = '#fff';
     ctx.font = '800 24px system-ui, sans-serif';
-    ctx.fillText('ドッキング成功', W / 2, H * .27);
+    var L = zoneLv(mileAt(cheerMi));
+    ctx.fillText(cheerMi === 0 ? 'ドッキング成功' : mileAt(cheerMi) + 'm 到達！', W / 2, H * .27);
     ctx.font = '600 13px system-ui, sans-serif';
     ctx.fillStyle = '#9fd8ff';
-    ctx.fillText('ここから低重力ゾーン', W / 2, H * .27 + 24);
+    ctx.fillText(cheerMi === 0 ? 'ここから低重力ゾーン'
+      : mileName(cheerMi) + '・ここから むずかしさ Lv' + L + (L >= MAX_LV ? '(最大)' : ''), W / 2, H * .27 + 24);
+    ctx.restore();
+  }
+
+  function drawToast() {
+    if (toastT <= 0) return;
+    var a = Math.min(1, toastT / 20, (150 - toastT) / 15);
+    var txt = '🏅 称号「' + toastName + '」';
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, a);
+    ctx.font = '800 15px system-ui, sans-serif';
+    var tw = ctx.measureText(txt).width + 28, y = H * .17;
+    ctx.fillStyle = 'rgba(10,14,40,.7)';
+    rr(W / 2 - tw / 2, y - 18, tw, 34, 17); ctx.fill();
+    ctx.fillStyle = '#ffe27a'; ctx.textAlign = 'center';
+    ctx.fillText(txt, W / 2, y + 5);
     ctx.restore();
   }
 
@@ -1453,6 +1611,9 @@
       if (cheer > 50 && cheer % 26 === 0) confetti(W / 2, camY + 70);
     }
     hm = Math.max(0, yToM(pl.y));
+    lv = zoneLv(hm);
+    if (toastT > 0) toastT--;
+    else if (toastQ.length) { toastName = toastQ.shift(); toastT = 150; }
     stepWind();
 
     var mv = 0;
@@ -1505,10 +1666,12 @@
           else if (p.type === CLOUD) { p.fading = true; pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffffff', 6); }
           else if (p.type === CONVEYOR) { pl.vy = JMP; pl.kx = p.dir * 4.2; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffc861', 4); }
           else if (p.type === CRUMBLE) { if (p.fallT === 0) p.fallT = 1; pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, '#c8a87a', 5); }
-          else if (p.type === STATION) {
+          else if (p.type === STATION || p.type === MILE) {
             pl.vy = JMP;
-            if (!goalGot) {
-              goalGot = true; cheer = 200; confetti(W / 2, p.y - 50);
+            if (!p.got) {
+              p.got = true; cheer = 200; cheerMi = p.mi; topMile = p.mi;
+              confetti(W / 2, p.y - 50);
+              if (p.type === STATION) goalGot = true;
             }
           } else { pl.vy = JMP; }
         }
@@ -1540,7 +1703,7 @@
     if (cap < camY) camY = cap;
 
     var cur = Math.floor(hm);
-    if (cur > score) { score = cur; elM.textContent = score; }
+    if (cur > score) { score = cur; elM.textContent = score; checkTitles(); }
 
     fillUpTo(camY - 120);
     for (var k = plats.length - 1; k >= 0; k--) {
@@ -1566,6 +1729,7 @@
     drawPlayer();
     drawWind();
     drawCheer();
+    drawToast();
   }
 
   // 調整値はすべて 60fps の1ステップ前提。描画の速さに関係なく実時間で 60 ステップ/秒 進める
@@ -1606,10 +1770,12 @@
     parts = []; foes = []; plats = [];
     droneT = 260; debrisT = 300; planeT = 180;
     wind = 0; windTo = 0; windT = 260;
-    goalPut = false; goalGot = false; cheer = 0;
+    goalGot = false; cheer = 0; cheerMi = 0; topMile = -1; lv = 0;
+    runTitles = []; toastQ = []; toastT = 0;
     elM.textContent = '0';
     groundY = H - 30;
     goalY = mToY(GOAL_M);
+    mileIdx = 0; mileY = goalY;
     var g = mk(0, groundY, BEAM, W);
     g.h = 30; g.ground = true;
     plats.push(g);
@@ -1633,8 +1799,8 @@
     if (got > 0) addCoins(got);
     elOM.textContent = score;
     $('oCoin').textContent = got > 0 ? ('+' + got + ' コイン' + (CH.coin ? '(' + CH.coin + '倍)' : '')) : '';
-    elNote.textContent = goalGot
-      ? 'ステーション到達'
+    elNote.textContent = runTitles.length ? '称号「' + runTitles.join('」「') + '」を手に入れた！'
+      : topMile >= 0 ? mileName(topMile) + '(' + mileAt(topMile) + 'm)に到達'
       : (score >= best && score > 0 ? 'ベスト更新' : 'ベストまで あと ' + Math.max(1, best - score) + 'm');
     vOver.classList.add('on');
   }
@@ -1715,6 +1881,8 @@
   $('bQuit').addEventListener('click', quitToTitle);
   $('bShop').addEventListener('click', openShop);
   $('bShopClose').addEventListener('click', closeShop);
+  $('bTitles').addEventListener('click', openTitles);
+  $('bTitlesClose').addEventListener('click', closeTitles);
 
   // ===== タイトルの絵 =====
   function title() {
