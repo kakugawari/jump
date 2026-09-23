@@ -197,7 +197,7 @@
           <label><input type="checkbox" id="ticketUse"> ブーストチケットを使う(残り <span id="ticketLeft">0</span>枚)</label>
         </div>
         <button id="bStart">スタート</button>
-        <div class="ver">版 2026-09-24b</div>
+        <div class="ver">版 2026-09-24c</div>
       </div>
     </div>
 
@@ -281,7 +281,7 @@
     { key: 'ninja', n: 'たまご忍者', tag: 'バランス型',
       jump: 9.8, speed: 5.6, grav: 1.0, wind: .6,
       t: 'どんな足場でもバランスをとるのが得意！安定して、着実に登ろう。' },
-    { key: 'king', n: 'スターキング', tag: '全部乗せ最強', price: 6000, coin: 1.5, tough: true,
+    { key: 'king', n: 'スターキング', tag: '全部乗せ最強', unlockM: 10000, coin: 1.5, tough: true,
       jump: 11.2, speed: 6.2, grav: .82, wind: .45,
       t: 'ジャンプも、浮遊も、報酬も全部できる！この子がいれば間違いない！(コイン1.5倍)' }
   ];
@@ -320,7 +320,7 @@
   var goalGot = false, cheer = 0, cheerMi = 0, topMile = -1;
   var mileIdx = 0, mileY = 0, lv = 0;
   // 称号は記録(ベスト)とは別に持つ。記録を消しても閉じない
-  var titles = {}, runTitles = [], toastQ = [], toastName = '', toastT = 0;
+  var titles = {}, runTitles = [], runUnlocks = [], toastQ = [], toastText = '', toastT = 0;
   var keys = {}, touchX = null;
   var frame = 0, hm = 0, invuln = 0;
   var droneT = 0, debrisT = 0, planeT = 0;
@@ -352,7 +352,8 @@
     BF = BOOST_F * k;
   }
 
-  function isLocked(c) { return !!c.price && !owned[c.key]; }
+  // 解放済みの印(owned)は記録とは別に持つ。記録を消しても閉じない
+  function isLocked(c) { return !!c.unlockM && !owned[c.key]; }
 
   // ピッカーやショップ用に、ゲーム中と同じ描き方で小さな絵を作る
   function charThumb(c, size) {
@@ -382,9 +383,11 @@
         if (isLocked(c)) {
           var seal = document.createElement('div');
           seal.className = 'seal';
-          seal.textContent = '🔒 ' + c.price;
+          seal.textContent = '🔒 ' + c.unlockM + 'm';
           d.appendChild(seal);
-          d.addEventListener('click', openShop);
+          d.addEventListener('click', function () {
+            $('pinfo').textContent = c.n + 'は、' + c.unlockM + 'm まで登ると仲間になる。｜' + c.t;
+          });
         } else {
           d.addEventListener('click', function () { pick(i); });
         }
@@ -428,15 +431,6 @@
       $('ticketUse').checked = false;
     }
   }
-  function buyChar(key) {
-    var i = findChar(key);
-    if (i < 0) return false;
-    var c = CHARS[i];
-    if (!isLocked(c) || coins < c.price) return false;
-    coins -= c.price; owned[c.key] = true;
-    saveCoins(); saveOwned(); renderCoinUI();
-    return true;
-  }
   function buyTicket() {
     if (coins < TICKET_PRICE) return false;
     coins -= TICKET_PRICE; tickets++;
@@ -460,25 +454,6 @@
   function buildShop() {
     var list = $('shopList');
     list.innerHTML = '';
-    for (var i = 0; i < CHARS.length; i++) {
-      var c = CHARS[i];
-      if (!c.price) continue;
-      var right;
-      if (isLocked(c)) {
-        right = document.createElement('button');
-        right.className = 'buybtn';
-        right.textContent = c.price + '🪙';
-        right.disabled = coins < c.price;
-        right.addEventListener('click', (function (key) {
-          return function () { if (buyChar(key)) { buildShop(); buildPicker(); } };
-        })(c.key));
-      } else {
-        right = document.createElement('span');
-        right.className = 'owned-tag';
-        right.textContent = '入手済み';
-      }
-      list.appendChild(shopRow(charThumb(c, 40), c.n + '(' + c.tag + ')', c.t, right));
-    }
     var tb = document.createElement('button');
     tb.className = 'buybtn';
     tb.textContent = TICKET_PRICE + '🪙';
@@ -508,9 +483,15 @@
     for (var i = 0; i < TITLES.length; i++) {
       var t = TITLES[i];
       if (titles[t.id] || score < t.m || (t.ch && t.ch !== CH.key)) continue;
-      titles[t.id] = true; runTitles.push(t.n); toastQ.push(t.n); got = true;
+      titles[t.id] = true; runTitles.push(t.n); toastQ.push('🏅 称号「' + t.n + '」'); got = true;
     }
     if (got) saveTitles();
+    for (var j = 0; j < CHARS.length; j++) {
+      var c = CHARS[j];
+      if (!isLocked(c) || score < c.unlockM) continue;
+      owned[c.key] = true; saveOwned();
+      runUnlocks.push(c.n); toastQ.push('★ ' + c.n + 'が仲間になった！');
+    }
   }
   function titleHow(t) { return (t.ch ? CHARS[findChar(t.ch)].n + 'で ' : '') + t.m + 'm に到達'; }
   function renderTitleUI() {
@@ -549,6 +530,7 @@
       coins = parseInt(localStorage.getItem('skyHopCoins') || '0', 10) || 0;
       tickets = parseInt(localStorage.getItem('skyHopTickets') || '0', 10) || 0;
       owned = JSON.parse(localStorage.getItem('skyHopOwned') || '{}') || {};
+      for (var u = 0; u < CHARS.length; u++) if (CHARS[u].unlockM && best >= CHARS[u].unlockM) owned[CHARS[u].key] = true;
       var i = findChar(localStorage.getItem('skyJumpChar'));
       if (i >= 0 && !isLocked(CHARS[i])) sel = i;
       titles = JSON.parse(localStorage.getItem('skyJumpTitles') || '{}') || {};
@@ -1591,7 +1573,7 @@
   function drawToast() {
     if (toastT <= 0) return;
     var a = Math.min(1, toastT / 20, (150 - toastT) / 15);
-    var txt = '🏅 称号「' + toastName + '」';
+    var txt = toastText;
     ctx.save();
     ctx.globalAlpha = Math.max(0, a);
     ctx.font = '800 15px system-ui, sans-serif';
@@ -1613,7 +1595,7 @@
     hm = Math.max(0, yToM(pl.y));
     lv = zoneLv(hm);
     if (toastT > 0) toastT--;
-    else if (toastQ.length) { toastName = toastQ.shift(); toastT = 150; }
+    else if (toastQ.length) { toastText = toastQ.shift(); toastT = 150; }
     stepWind();
 
     var mv = 0;
@@ -1771,7 +1753,7 @@
     droneT = 260; debrisT = 300; planeT = 180;
     wind = 0; windTo = 0; windT = 260;
     goalGot = false; cheer = 0; cheerMi = 0; topMile = -1; lv = 0;
-    runTitles = []; toastQ = []; toastT = 0;
+    runTitles = []; runUnlocks = []; toastQ = []; toastT = 0;
     elM.textContent = '0';
     groundY = H - 30;
     goalY = mToY(GOAL_M);
@@ -1799,7 +1781,9 @@
     if (got > 0) addCoins(got);
     elOM.textContent = score;
     $('oCoin').textContent = got > 0 ? ('+' + got + ' コイン' + (CH.coin ? '(' + CH.coin + '倍)' : '')) : '';
-    elNote.textContent = runTitles.length ? '称号「' + runTitles.join('」「') + '」を手に入れた！'
+    var news = runUnlocks.map(function (n) { return n + 'が仲間になった！'; });
+    if (runTitles.length) news.push('称号「' + runTitles.join('」「') + '」を手に入れた！');
+    elNote.textContent = news.length ? news.join(' ')
       : topMile >= 0 ? mileName(topMile) + '(' + mileAt(topMile) + 'm)に到達'
       : (score >= best && score > 0 ? 'ベスト更新' : 'ベストまで あと ' + Math.max(1, best - score) + 'm');
     vOver.classList.add('on');
