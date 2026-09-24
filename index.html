@@ -75,34 +75,67 @@
   .veil.on { display: flex; }
   .card { text-align: center; padding: 26px 22px; max-width: 320px; }
   /* ===== タイトル(明るい空の上に、キャラの札を4枚) ===== */
-  /* タイトルの間は、上の高さ表示を隠す(明るい空の上に 0m が浮いて見える) */
-  #board:has(#vStart.on) .hud { visibility: hidden; }
-  #vStart {
-    background: linear-gradient(rgba(255,255,255,0) 55%, rgba(60,40,110,.18));
+  /* タイトルまわりの間は、上の高さ表示を隠す(明るい空の上に 0m が浮いて見える) */
+  #board:has(#vStart.on) .hud, #board:has(#vChars.on) .hud, #board:has(#vMenu.on) .hud { visibility: hidden; }
+  #vStart { display: none; background: none; }
+  #vStart.on { display: block; }
+  /* 後ろのタイトルの絵には、にせのコイン枚数(13693)とボタンが描いてある。ぼかして読めなくする */
+  #vChars {
+    background: rgba(24,30,96,.5); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
     align-items: flex-start; overflow-y: auto;
   }
   .tcard {
-    width: 100%; margin: auto 0; text-align: center;
-    padding: calc(env(safe-area-inset-top) + 6px) 14px calc(env(safe-area-inset-bottom) + 8px);
+    position: relative; width: 100%; margin: auto 0; text-align: center;
+    padding: calc(env(safe-area-inset-top) + 8px) 16px calc(env(safe-area-inset-bottom) + 6px);
   }
-  .logo { position: relative; margin: 20px 0 0; }
-  .logo h1 {
-    margin: 0; font-size: 40px; line-height: 1.15; color: #fff; white-space: nowrap; letter-spacing: .01em;
-    font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", system-ui, sans-serif; font-weight: 800;
-    /* ふちは影を8方向に重ねて外側だけに付ける(text-stroke だと字の内側まで削れる) */
-    text-shadow:
-      3px 0 0 #2f7fe0, -3px 0 0 #2f7fe0, 0 3px 0 #2f7fe0, 0 -3px 0 #2f7fe0,
-      2px 2px 0 #2f7fe0, -2px 2px 0 #2f7fe0, 2px -2px 0 #2f7fe0, -2px -2px 0 #2f7fe0,
-      0 7px 0 #1d56b4, 0 12px 18px rgba(20,50,130,.35);
-    transform: rotate(-4deg);
+  /* タイトルの絵(title.jpg 1024x1536)を置く箱。canvas に描く位置(ART_W/ART_H/ART_TOP)と必ず揃える。
+     横は 452pt にして左右を 11pt ずつ切り、縦を稼ぐ。それ以上切ると、端の歯車とコインが画面から出る */
+  .tart { position: absolute; left: calc(50% - 226px); top: 50px; width: 452px; height: 678px; }
+  /* 絵に描いてあるボタンの上に重ねる、見えない押し場所。位置は絵の上の割合で決める */
+  button.hot {
+    position: absolute; padding: 0; margin: 0; border: 0; border-radius: 999px;
+    background: transparent; box-shadow: none; color: transparent;
   }
-  .logo svg { position: absolute; left: 50%; top: -24px; width: 190px; height: 40px; margin-left: -70px; overflow: visible; }
-  .tagline {
-    display: inline-block; margin: 10px 0 10px; padding: 4px 14px; border-radius: 999px;
-    font-size: 14px; font-weight: 800; letter-spacing: .04em; color: #fff;
-    background: rgba(40,90,190,.35); transform: rotate(-2deg);
-    text-shadow: 0 1px 3px rgba(20,40,110,.5);
+  button.hot:active { background: rgba(255,255,255,.28); transform: none; }
+  #bMenu { left: 3.3%; top: 1.2%; width: 9%; height: 6%; border-radius: 50%; }
+  #bStart { left: 25.6%; top: 70.3%; width: 48.4%; height: 9.9%; }
+  #bChars { left: 20.7%; top: 82%; width: 28.9%; height: 7.7%; }
+  #bShop { left: 50.6%; top: 82%; width: 28.7%; height: 7.7%; }
+  /* 絵のコイン(13693)の上に、本当の枚数を重ねて隠す */
+  .tcoin {
+    position: absolute; left: 75%; top: 1.7%; width: 21.6%; height: 4.5%;
+    display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 0 12px 0 4px;
+    border-radius: 999px; background: linear-gradient(#2f55c4, #22409f); border: 2px solid rgba(190,215,255,.85);
+    color: #fff; font-size: 16px; font-weight: 800; letter-spacing: .04em; font-variant-numeric: tabular-nums;
   }
+  .coin-ico {
+    width: 24px; height: 24px; margin-right: auto; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 35% 30%, #fff3a0, #ffc21a 55%, #e89a00); box-shadow: inset 0 0 0 2px #ffe27a;
+    color: #fff; font-size: 12px; text-shadow: 0 1px 1px rgba(180,100,0,.6);
+  }
+  /* 絵の下の余り(ぼかした同じ絵の上)に、持ち物の札と版を置く */
+  .tfoot {
+    position: absolute; left: 0; right: 0; top: 728px; bottom: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+    padding: 0 16px calc(env(safe-area-inset-bottom) + 6px);
+  }
+  .item-toggles { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+  .item-toggles:empty { display: none; }
+  .itog {
+    font-size: 12px; padding: 6px 11px; border-radius: 999px; letter-spacing: 0; box-shadow: none;
+    color: #fff; background: rgba(70,50,150,.45); border: 1px solid rgba(255,255,255,.6);
+  }
+  .itog.on { background: #fff; color: #5a3aa8; border-color: #fff; }
+  #vStart .ver { margin-top: 6px; color: #fff; opacity: .8; text-shadow: 0 1px 2px rgba(60,30,90,.6); }
+  #vChars h2 {
+    margin: 6px 0 12px; font-size: 26px; color: #fff; letter-spacing: .08em;
+    text-shadow: 0 2px 0 #3f6fd8, 0 4px 10px rgba(20,40,130,.4);
+  }
+  #bCharsOk { width: 220px; border-radius: 999px; font-size: 18px; color: #fff; background: linear-gradient(#8a93ff, #5a64ea);
+    border: 3px solid rgba(255,255,255,.85); box-shadow: 0 5px 0 #3f47c2; }
+  .menu-list { display: flex; flex-direction: column; gap: 10px; margin: 6px 0 14px; }
+  .menu-list button.ghost { margin: 0; font-size: 15px; padding: 12px 18px; }
+  .menu-list .tcount { opacity: .6; font-size: 12px; margin-left: 4px; }
   .picker { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 12px; }
   .ccard {
     position: relative; border-radius: 18px; overflow: hidden; cursor: pointer; text-align: center;
@@ -143,26 +176,6 @@
     color: #fff; font-size: 15px; font-weight: 800; line-height: 1.35;
   }
   .ccard .seal small { display: block; font-size: 10.5px; font-weight: 700; opacity: .85; }
-  .tbar { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 8px; flex-wrap: wrap; }
-  .tbar .coin-pill, .tbar button.ghost {
-    margin: 0; background: rgba(28,40,100,.42); border: 1px solid rgba(255,255,255,.55); color: #fff; opacity: 1;
-    font-size: 12.5px; padding: 7px 12px; border-radius: 999px;
-  }
-  .tbar .titlebtn { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .item-toggles { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
-  .item-toggles:empty { display: none; }
-  .itog {
-    font-size: 11.5px; padding: 6px 10px; border-radius: 999px; letter-spacing: 0; box-shadow: none;
-    color: #fff; background: rgba(28,40,100,.42); border: 1px solid rgba(255,255,255,.5);
-  }
-  .itog.on { background: #fff; color: #1d3a80; border-color: #fff; }
-  #bStart {
-    width: 250px; padding: 15px 0; font-size: 20px; letter-spacing: .12em; border-radius: 999px; color: #fff;
-    background: linear-gradient(#ffc04d, #ff7a3d); border: 3px solid #fff;
-    text-shadow: 0 2px 0 rgba(170,60,0,.45); box-shadow: 0 5px 0 #d85a1f, 0 10px 22px rgba(200,80,20,.4);
-  }
-  #bStart:active { transform: translateY(3px); box-shadow: 0 2px 0 #d85a1f, 0 6px 14px rgba(200,80,20,.4); }
-  #vStart .ver { color: #fff; opacity: .75; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
   .card h2 { margin: 0 0 8px; font-size: 24px; font-weight: 800; }
   .card p { margin: 0 0 20px; font-size: 14px; line-height: 1.85; opacity: .82; }
   .card .big { font-size: 46px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
@@ -188,7 +201,6 @@
     font-variant-numeric: tabular-nums;
   }
   .coin-pill.big-pill { font-size: 16px; padding: 7px 16px; margin: 2px 0 14px; }
-  .shopbtn { padding: 8px 16px; font-size: 12.5px; }
 
   .shop-card { max-width: 340px; }
   .shop-list {
@@ -227,8 +239,6 @@
   .chip.sure { background: linear-gradient(180deg, #ffe27a, #ffb14d); }
   .chip:disabled { opacity: .35; }
 
-  .titlebtn { margin: 0 0 10px; padding: 6px 14px; font-size: 12.5px; }
-  .titlebtn .tcount { opacity: .6; font-size: 11px; margin-left: 4px; }
   .shop-row.off { opacity: .55; }
   .ver { margin-top: 8px; font-size: 10px; opacity: .45; letter-spacing: .05em; }
   .oCoin { color: var(--lime); font-size: 13px; font-weight: 700; min-height: 1.2em; margin: -8px 0 10px; }
@@ -246,27 +256,34 @@
     </div>
 
     <div class="veil on" id="vStart">
-      <div class="tcard">
-        <div class="logo">
-          <svg viewBox="0 0 190 40" aria-hidden="true">
-            <path d="M8 36 C 50 10, 115 4, 176 12" fill="none" stroke="#2f7fe0" stroke-width="9" stroke-linecap="round"/>
-            <path d="M160 2 L 178 12 L 163 24" fill="none" stroke="#2f7fe0" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M8 36 C 50 10, 115 4, 176 12" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
-            <path d="M160 2 L 178 12 L 163 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <h1>スカイジャンパー</h1>
-        </div>
-        <div class="tagline">＼ いろんな個性で、もっと高く！ ／</div>
-        <div class="picker" id="picker"></div>
-        <div class="tbar">
-          <span class="coin-pill">🪙 <span id="coinCount">0</span></span>
-          <button class="ghost shopbtn" id="bShop">🛒 ショップ</button>
-          <button class="ghost titlebtn" id="bTitles">🏅 <span id="titleName">称号なし</span>
-            <span class="tcount" id="titleCount"></span></button>
-        </div>
+      <div class="tart">
+        <button class="hot" id="bMenu" aria-label="メニュー"></button>
+        <div class="tcoin"><span class="coin-ico">★</span><span id="coinCount">0</span></div>
+        <button class="hot" id="bStart" aria-label="スタート">スタート</button>
+        <button class="hot" id="bChars" aria-label="キャラ選択">キャラ選択</button>
+        <button class="hot" id="bShop" aria-label="ショップ">ショップ</button>
+      </div>
+      <div class="tfoot">
         <div class="item-toggles" id="itemToggles"></div>
-        <button id="bStart">スタート</button>
-        <div class="ver" id="ver">版 2026-09-24j</div>
+        <div class="ver" id="ver">版 2026-09-24l</div>
+      </div>
+    </div>
+
+    <div class="veil" id="vChars">
+      <div class="tcard">
+        <h2>キャラ選択</h2>
+        <div class="picker" id="picker"></div>
+        <button id="bCharsOk">けってい</button>
+      </div>
+    </div>
+
+    <div class="veil" id="vMenu">
+      <div class="card">
+        <h2>メニュー</h2>
+        <div class="menu-list">
+          <button class="ghost" id="bTitles">🏅 称号 <span id="titleName">称号なし</span><span class="tcount" id="titleCount"></span></button>
+        </div>
+        <button class="ghost" id="bMenuClose">とじる</button>
       </div>
     </div>
 
@@ -442,7 +459,7 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var elM = $('hM'), elBest = $('hBest'), elOM = $('oM'), elNote = $('oNote');
-  var vStart = $('vStart'), vOver = $('vOver'), vPause = $('vPause'), vShop = $('vShop'), vTitles = $('vTitles'), bPause = $('bPause');
+  var vStart = $('vStart'), vChars = $('vChars'), vMenu = $('vMenu'), vOver = $('vOver'), vPause = $('vPause'), vShop = $('vShop'), vTitles = $('vTitles'), bPause = $('bPause');
 
   function rr(x, y, w, h, r) {
     ctx.beginPath();
@@ -735,7 +752,7 @@
       list.appendChild(row);
     }
   }
-  function openTitles() { buildTitles(); vStart.classList.remove('on'); vTitles.classList.add('on'); }
+  function openTitles() { buildTitles(); vMenu.classList.remove('on'); vStart.classList.remove('on'); vTitles.classList.add('on'); }
   function closeTitles() { vTitles.classList.remove('on'); vStart.classList.add('on'); }
 
   function loadBest() {
@@ -770,7 +787,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-09-24j';
+  var VERSION = '版 2026-09-24l';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -791,7 +808,7 @@
     cv.width = Math.round(W * dpr);
     cv.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    sunImg = null;
+    sunImg = null; floorImg = null;
     renderDiag();
   }
 
@@ -2384,10 +2401,14 @@
   $('bRetry').addEventListener('click', start);
   $('bChange').addEventListener('click', function () {
     vOver.classList.remove('on');
-    vStart.classList.add('on');
     buildPicker();
     title();
+    vChars.classList.add('on');
   });
+  $('bChars').addEventListener('click', function () { vStart.classList.remove('on'); vChars.classList.add('on'); });
+  $('bCharsOk').addEventListener('click', function () { vChars.classList.remove('on'); vStart.classList.add('on'); });
+  $('bMenu').addEventListener('click', function () { renderTitleUI(); vStart.classList.remove('on'); vMenu.classList.add('on'); });
+  $('bMenuClose').addEventListener('click', function () { vMenu.classList.remove('on'); vStart.classList.add('on'); });
   bPause.addEventListener('click', pause);
   $('bResume').addEventListener('click', resume);
   $('bQuit').addEventListener('click', quitToTitle);
@@ -2398,69 +2419,68 @@
 
   // ===== タイトルの絵 =====
   // 青空から夕焼けへ抜ける明るい空。もこもこの雲・きらめき・遠くの街。止まった絵なので一度だけ描く
-  var TITLE_SKY = 'linear-gradient(#3d9cf0 0%, #72bcf6 26%, #b9d6f6 46%, #ffd0d4 62%, #ffb98a 80%, #ff9d6e 100%)';
-  function seeded(n) { return function () { n = (n * 16807) % 2147483647; return (n - 1) / 2147483646; }; }
-  // 大きな雲: 丸をたくさん重ね、上は白く下は桃色〜橙に染める。ふちは先に太く引いて外側だけ残す
-  // 丸どうしのふちが透けないよう、一度別の絵に描いてから貼る(薄くしたいときはその絵ごと薄める)
-  function titleCloud(g, x, y, w, h, R, top, bottom, alpha) {
-    var pad = h * .9, img = sprite(w + pad * 2, h * 2 + pad, function (c) {
-      var ox = w / 2 + pad, oy = h + pad * .5, puffs = [], n = Math.max(6, Math.round(w / 26));
-      for (var i = 0; i < n; i++) {
-        var u = i / (n - 1), bump = Math.sin(u * Math.PI);
-        puffs.push([ox + (u - .5) * w * .92, oy + h * (.18 - bump * .42) + R() * h * .12, h * (.3 + bump * .38 + R() * .12)]);
-      }
-      function path() {
-        c.beginPath();
-        puffs.forEach(function (p) { c.moveTo(p[0] + p[2], p[1]); c.arc(p[0], p[1], p[2], 0, 6.2832); });
-        c.rect(ox - w * .46, oy + h * .1, w * .92, h * .3);
-      }
-      path(); c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 5; c.stroke();
-      var gr = c.createLinearGradient(0, oy - h * .6, 0, oy + h * .45);
-      gr.addColorStop(0, '#fffefb'); gr.addColorStop(.5, top); gr.addColorStop(1, bottom);
-      path(); c.fillStyle = gr; c.fill();
+  // いただいた絵をそのまま使う。.tart の箱(CSS)と同じ位置・大きさに描く
+  var ART_W = 452, ART_H = 678, ART_TOP = 50;
+  var titleImg = new Image();
+  titleImg.onload = function () { if (!run && !paused) title(); };
+  titleImg.src = 'title.jpg';
+  // 雲の床: 丸を重ねて、上は白く下は藤色〜桃色。一度だけ作る
+  var floorImg = null;
+  function cloudFloor() {
+    var fw = W, fh = H - (ART_TOP + ART_H * .8) - 20;
+    if (floorImg && floorImg.w === fw && floorImg.h === fh) return floorImg.c;
+    var seed = 7;
+    function R() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+    var c = sprite(fw, fh, function (g) {
+      [[.05, '#f7e4f4', '#d6a6dc', 36], [.35, '#fff1f8', '#e7b5dc', 44], [.65, '#ffffff', '#efc6e6', 52]].forEach(function (row) {
+        var cy = fh * row[0] + 30, rr = row[3];
+        g.beginPath();
+        for (var x = -rr; x < fw + rr; x += rr * (1 + R() * .5)) {
+          var r = rr * (.8 + R() * .5), y = cy + (R() - .5) * rr * .5;
+          g.moveTo(x + r, y); g.arc(x, y, r, 0, 6.2832);
+        }
+        g.rect(-10, cy, fw + 20, fh);
+        var gr = g.createLinearGradient(0, cy - rr, 0, cy + rr * 1.2);
+        gr.addColorStop(0, row[1]); gr.addColorStop(1, row[2]);
+        g.fillStyle = gr; g.fill();
+      });
     });
-    g.save(); g.globalAlpha = alpha || 1;
-    g.drawImage(img, x - w / 2 - pad, y - h - pad * .5, w + pad * 2, h * 2 + pad);
-    g.restore();
-  }
-  function titleSparkle(g, x, y, r, a) {
-    g.save();
-    g.globalAlpha = a; g.fillStyle = '#fff';
-    g.shadowColor = 'rgba(255,255,255,.9)'; g.shadowBlur = r * 2;
-    g.beginPath();
-    g.moveTo(x, y - r * 2); g.quadraticCurveTo(x, y, x + r * 2, y); g.quadraticCurveTo(x, y, x, y + r * 2);
-    g.quadraticCurveTo(x, y, x - r * 2, y); g.quadraticCurveTo(x, y, x, y - r * 2);
-    g.fill();
-    g.restore();
+    floorImg = { w: fw, h: fh, c: c };
+    return c;
   }
   function title() {
     // ゲームが空の色を入れ直せるよう、覚えている色を忘れさせる
-    skyCss = ''; cv.style.background = TITLE_SKY;
+    skyCss = ''; cv.style.background = '#8a86e0';
     ctx.clearRect(0, 0, W, H);
-    var R = seeded(20260924);
-    // 低い夕日のにじみ
-    var sun = ctx.createRadialGradient(W * .74, H * .8, 10, W * .74, H * .8, W * .7);
-    sun.addColorStop(0, 'rgba(255,236,170,.85)'); sun.addColorStop(.35, 'rgba(255,190,130,.35)'); sun.addColorStop(1, 'rgba(255,170,120,0)');
-    ctx.fillStyle = sun; ctx.fillRect(0, 0, W, H);
-    // 高い所のうすい雲(青空に白)
-    titleCloud(ctx, W * .12, H * .1, 190, 44, R, '#f4f8ff', '#d9e6fb', .75);
-    titleCloud(ctx, W * .92, H * .05, 170, 40, R, '#f4f8ff', '#d9e6fb', .75);
-    // 夕焼けに染まった大きな雲
-    titleCloud(ctx, W * .02, H * .36, 240, 90, R, '#ffe9ec', '#ffb3b8');
-    titleCloud(ctx, W * 1.02, H * .47, 260, 96, R, '#fff0e6', '#ffb489');
-    titleCloud(ctx, W * .5, H * .62, 300, 80, R, '#ffeef0', '#ffbfae');
-    // 遠くの街(うす紫)と手前の街
-    var far = buildCity(W, 150, 90, 210, '#a592d6', '#b8a8e2', 'rgba(255,240,200,.7)', 'rgba(255,255,255,.12)', 3);
-    ctx.drawImage(far, 0, H - 150 - 30, W, 270);
-    titleCloud(ctx, W * .2, H - 105, 260, 60, R, '#fff2ea', '#ffc7a6');
-    titleCloud(ctx, W * .86, H - 95, 240, 56, R, '#fff2ea', '#ffc7a6');
-    var near = buildCity(W, 150, 50, 120, '#6f5fb0', '#8474c4', 'rgba(255,220,150,.9)', 'rgba(255,255,255,.08)', 4);
-    ctx.drawImage(near, 0, H - 150 + 30, W, 270);
-    // きらめき(上の空に多め)
-    for (var i = 0; i < 26; i++) {
-      var y = Math.pow(R(), 1.6) * H * .75;
-      titleSparkle(ctx, R() * W, y, 1.2 + R() * 2.6, .55 + R() * .45);
-    }
+    if (!titleImg.naturalWidth) return;
+    // 絵の上の余りは、絵の上端の空をぼかして引き伸ばす。
+    // ぼかしは小さく縮めてから引き伸ばして作る(canvas の filter は iOS の Safari で効かない)
+    var tw = 28, th = 8, tiny = document.createElement('canvas');
+    tiny.width = tw; tiny.height = th;
+    var tg = tiny.getContext('2d');
+    tg.imageSmoothingQuality = 'high';
+    // 上端 24px だけを使う(それより下には歯車とコインが描いてあり、ぼかすと黄色いしみになる)
+    tg.drawImage(titleImg, 0, 0, 1024, 24, 0, 0, tw, th);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(tiny, 0, 0, tw, th, (W - ART_W) / 2, 0, ART_W, ART_TOP + 30);
+    // 下の余りは、絵のいちばん下の雲に続くもこもこ雲を敷く
+    // (下端の帯を伸ばすと、ビルの縦の線がそのまま縦の筋になった。絵全体をぼかすと、描いてあるボタンがぼやけて2つ目に見えた)
+    var y0 = ART_TOP + ART_H * .8;
+    var fl = ctx.createLinearGradient(0, y0, 0, H);
+    fl.addColorStop(0, '#d9a9d8'); fl.addColorStop(1, '#b8a6ea');
+    ctx.fillStyle = fl; ctx.fillRect(0, y0, W, H - y0);
+    ctx.drawImage(cloudFloor(), 0, y0 + 20, W, H - y0 - 20);
+    // くっきりした絵。上下のふちだけぼかしへなじませる(上は歯車にかからないよう短く)
+    var art = sprite(ART_W, ART_H, function (g) {
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(titleImg, 0, 0, ART_W, ART_H);
+      g.globalCompositeOperation = 'destination-in';
+      var gr = g.createLinearGradient(0, 0, 0, ART_H);
+      gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(.012, '#000');
+      gr.addColorStop(.9, '#000'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, ART_W, ART_H);
+    });
+    ctx.drawImage(art, (W - ART_W) / 2, ART_TOP, ART_W, ART_H);
   }
 
   loadBest();
