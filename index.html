@@ -159,7 +159,7 @@
     content: ''; position: absolute; left: 50%; top: 50%; width: 96px; height: 70px; margin: -30px 0 0 -48px;
     border-radius: 50%; background: radial-gradient(closest-side, var(--tint), rgba(255,255,255,0));
   }
-  .ccard .art canvas { position: relative; margin-top: -14px; }
+  .ccard .art canvas { position: relative; margin-top: -4px; }
   .ccard.on .art canvas { animation: hop 1.1s ease-in-out infinite; }
   @keyframes hop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
   .ccard .cdesc { margin: 0 10px; font-size: 10.5px; line-height: 1.5; min-height: 3em; font-weight: 600; opacity: .8; }
@@ -500,6 +500,14 @@
     var g = cvs.getContext('2d');
     g.scale(d, d);
     // ゲーム中と同じ向きに潰す・伸ばす(着地で横に広がり、跳ぶと縦に伸びる)
+    var S = spriteFor(c.key, P || skinOf(c.key));
+    if (S) {
+      var wmax = 0;
+      S.box.forEach(function (b) { wmax = Math.max(wmax, b.x1 - b.x0); });
+      var k = Math.min(size * .84 / (S.box[0].y1 - S.box[0].y0), size * .96 / wmax);
+      drawSprite(g, S, st || 'normal', size / 2, size * .94, k, 1, 1, 1);
+      return cvs;
+    }
     var r = size * .2, rx = r, ry = r;
     if (st === 'land') { rx = r * 1.14; ry = r * .8; }
     else if (st === 'jump') { rx = r * .9; ry = r * 1.12; }
@@ -792,7 +800,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-09-24o';
+  var VERSION = '版 2026-09-24p';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -1931,7 +1939,64 @@
   }
 
   var DRAW = { usagi: drawUsagi, kumo: drawKumo, ninja: drawNinja, king: drawKing };
-  function drawChar(g, key, cx, by, rx, ry, st, t, P) { return DRAW[key](g, cx, by, rx, ry, st, t, P); }
+
+  // ===== キャラの絵 =====
+  // char-<key>.webp は 3ポーズ(通常・ジャンプ・着地)を同じ大きさのセルに横に並べたもの。
+  // どのポーズも同じ縮尺で、セルの下に足をそろえてある。読み込めるまでと、色違いを付けている間は図形で描く
+  var POSE = { normal: 0, jump: 1, land: 2 };
+  var CHAR_H = 54;          // ゲーム中の「通常」ポーズの高さ(pt)
+  var SPR = {};
+  function loadSprites() {
+    var left = CHARS.length;
+    CHARS.forEach(function (c) {
+      var img = new Image();
+      img.onload = function () {
+        // ポーズごとに絵のある範囲を測っておく(大きさを決めるのと、ヘルメットの中心に使う)
+        var cw = img.naturalWidth / 3, ch = img.naturalHeight;
+        var t = document.createElement('canvas'); t.width = img.naturalWidth; t.height = ch;
+        var tg = t.getContext('2d'); tg.drawImage(img, 0, 0);
+        var d = tg.getImageData(0, 0, t.width, ch).data, box = [];
+        for (var n = 0; n < 3; n++) {
+          var x0 = cw, x1 = 0, y0 = ch, y1 = 0;
+          for (var y = 0; y < ch; y++) for (var x = Math.round(n * cw); x < Math.round((n + 1) * cw); x++) {
+            if (d[(y * t.width + x) * 4 + 3] > 40) {
+              var lx = x - n * cw;
+              if (lx < x0) x0 = lx; if (lx > x1) x1 = lx; if (y < y0) y0 = y; if (y > y1) y1 = y;
+            }
+          }
+          box.push({ x0: x0, x1: x1, y0: y0, y1: y1 });
+        }
+        SPR[c.key] = { img: img, cw: cw, ch: ch, box: box };
+        if (--left === 0 && !run) buildPicker();
+      };
+      img.onerror = function () { --left; };
+      img.src = 'char-' + c.key + '.webp';
+    });
+  }
+  // 絵で描けるか(読み込めていて、もとの色のとき)
+  function spriteFor(key, P) {
+    var S = SPR[key];
+    return S && P === SKINS[key][0] ? S : null;
+  }
+  // 足もと(cx, by)を基準に、ポーズの絵を描く。k は縮尺(絵の画素 → pt)、sx/sy は伸び縮み、face は向き
+  function drawSprite(g, S, st, cx, by, k, sx, sy, face) {
+    var n = POSE[st] || 0, b = S.box[n];
+    var w = S.cw * k, h = S.ch * k;
+    g.save();
+    g.translate(cx, by);
+    g.scale(sx * (face || 1), sy);
+    // セルの下端 = 絵の足もと(y1)。足もとが by に来るよう上へずらす
+    g.drawImage(S.img, n * S.cw, 0, S.cw, S.ch, -w / 2, -(b.y1 + 1) * k, w, h);
+    g.restore();
+    // 絵の真ん中の高さ(ヘルメットの中心に使う)
+    return by - ((b.y1 - b.y0) / 2) * k * sy;
+  }
+  function drawChar(g, key, cx, by, rx, ry, st, t, P) {
+    var S = spriteFor(key, P);
+    if (!S) return DRAW[key](g, cx, by, rx, ry, st, t, P);
+    var R = (rx + ry) / 2 || 1;
+    return drawSprite(g, S, st, cx, by, (R / 15) * CHAR_H / (S.box[0].y1 - S.box[0].y0), 1, 1, 1);
+  }
 
   function newPlayer() {
     return { x: W / 2 - 15, y: groundY - 26, w: 30, h: 26, vy: JMP, kx: 0, sq: 0, landT: 0 };
@@ -1951,11 +2016,17 @@
     if (invuln > 0 && (invuln >> 2) % 2 === 0) ctx.globalAlpha = .45;
     ctx.fillStyle = 'rgba(0,0,0,.2)';
     ell(ctx, cx, by + 2, rx * .85, 3); ctx.fill();
-    var cy = drawChar(ctx, CH.key, cx, by, rx, ry, st, frame, skinOf(CH.key));
+    var S = spriteFor(CH.key, skinOf(CH.key)), cy;
+    if (S) {
+      var k = CHAR_H / (S.box[0].y1 - S.box[0].y0);
+      cy = drawSprite(ctx, S, st, cx, by + 1, k, 1 + (rx / R - 1) * .5, 1 + (ry / R - 1) * .5, pl.face || 1);
+    } else {
+      cy = drawChar(ctx, CH.key, cx, by, rx, ry, st, frame, skinOf(CH.key));
+    }
 
     // 高いところではヘルメット
     if (hm >= 1400) {
-      var hr = Math.max(rx, ry) * 1.32;
+      var hr = S ? CHAR_H * .62 : Math.max(rx, ry) * 1.32;
       ctx.strokeStyle = 'rgba(200,235,255,.7)'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(cx, cy, hr, 0, 6.2832); ctx.stroke();
       ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1.5;
@@ -2229,6 +2300,7 @@
       if (touchX < c - 8) mv = -CH.speed;
       else if (touchX > c + 8) mv = CH.speed;
     }
+    if (mv) pl.face = mv > 0 ? 1 : -1;
     pl.x += mv + wind * 1.9 * CH.wind;
 
     if (pl.kx !== 0) {
@@ -2547,6 +2619,7 @@
     ctx.drawImage(titleImg, (W - iw * s) / 2, (H - ih * s) / 2, iw * s, ih * s);
   }
 
+  loadSprites();
   loadBest();
   applyChar();
   buildPicker();

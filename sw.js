@@ -1,5 +1,5 @@
-const CACHE = 'sky-hopper-v3';
-const ASSETS = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'title-v2.jpg'];
+const CACHE = 'sky-hopper-v4';
+const ASSETS = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'title-v2.jpg', 'char-usagi.webp', 'char-kumo.webp', 'char-ninja.webp', 'char-king.webp'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
