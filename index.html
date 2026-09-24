@@ -79,7 +79,7 @@
   #board:has(#vStart.on) .hud, #board:has(#vChars.on) .hud, #board:has(#vMenu.on) .hud { visibility: hidden; }
   #vStart { display: none; background: none; }
   #vStart.on { display: block; }
-  /* 後ろのタイトルの絵には、にせのコイン枚数(13693)とボタンが描いてある。ぼかして読めなくする */
+  /* 後ろのタイトルの絵にはボタンが描いてある。押せそうに見えないよう、ぼかす */
   #vChars {
     background: rgba(24,30,96,.5); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
     align-items: flex-start; overflow-y: auto;
@@ -88,37 +88,40 @@
     position: relative; width: 100%; margin: auto 0; text-align: center;
     padding: calc(env(safe-area-inset-top) + 8px) 16px calc(env(safe-area-inset-bottom) + 6px);
   }
-  /* タイトルの絵(title.jpg 1024x1536)を置く箱。canvas に描く位置(ART_W/ART_H/ART_TOP)と必ず揃える。
-     横は 452pt にして左右を 11pt ずつ切り、縦を稼ぐ。それ以上切ると、端の歯車とコインが画面から出る */
-  .tart { position: absolute; left: calc(50% - 226px); top: 50px; width: 452px; height: 678px; }
-  /* 絵に描いてあるボタンの上に重ねる、見えない押し場所。位置は絵の上の割合で決める */
+  /* タイトルの絵(title-v2.jpg 852x1846)は画面(430x932)と同じ縦横比なので、画面いっぱいに敷く。
+     押し場所は絵の上の割合で決める(画面と絵がほぼ同じ比なので、そのまま画面の割合になる) */
+  .tart { position: absolute; inset: 0; }
+  /* 絵に描いてあるボタンの上に重ねる、見えない押し場所 */
   button.hot {
     position: absolute; padding: 0; margin: 0; border: 0; border-radius: 999px;
     background: transparent; box-shadow: none; color: transparent;
   }
   button.hot:active { background: rgba(255,255,255,.28); transform: none; }
-  #bMenu { left: 3.3%; top: 1.2%; width: 9%; height: 6%; border-radius: 50%; }
-  #bStart { left: 25.6%; top: 70.3%; width: 48.4%; height: 9.9%; }
-  #bChars { left: 20.7%; top: 82%; width: 28.9%; height: 7.7%; }
-  #bShop { left: 50.6%; top: 82%; width: 28.7%; height: 7.7%; }
-  /* 絵のコイン(13693)の上に、本当の枚数を重ねて隠す */
+  #bStart { left: 19.4%; top: 78.8%; width: 59.8%; height: 7.4%; }
+  #bChars { left: 15.6%; top: 88.2%; width: 32.9%; height: 6%; }
+  #bShop { left: 51.9%; top: 88.4%; width: 32.5%; height: 5.5%; }
+  /* 絵に無い歯車とコインは、ロゴの矢印にかからない上の左右に置く */
+  .gear {
+    position: absolute; right: 12px; top: calc(env(safe-area-inset-top) + 4px);
+    width: 42px; height: 42px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: rgba(30,80,190,.35); border: 2px solid rgba(255,255,255,.8); box-shadow: 0 2px 8px rgba(20,60,150,.25);
+  }
+  .gear svg { width: 24px; height: 24px; }
   .tcoin {
-    position: absolute; left: 75%; top: 1.7%; width: 21.6%; height: 4.5%;
-    display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 0 12px 0 4px;
-    border-radius: 999px; background: linear-gradient(#2f55c4, #22409f); border: 2px solid rgba(190,215,255,.85);
+    position: absolute; left: 12px; top: calc(env(safe-area-inset-top) + 6px);
+    display: flex; align-items: center; gap: 6px; padding: 3px 14px 3px 4px;
+    border-radius: 999px; background: rgba(30,80,190,.4); border: 2px solid rgba(255,255,255,.8);
     color: #fff; font-size: 16px; font-weight: 800; letter-spacing: .04em; font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 2px rgba(10,40,120,.5);
   }
   .coin-ico {
-    width: 24px; height: 24px; margin-right: auto; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center;
     background: radial-gradient(circle at 35% 30%, #fff3a0, #ffc21a 55%, #e89a00); box-shadow: inset 0 0 0 2px #ffe27a;
-    color: #fff; font-size: 12px; text-shadow: 0 1px 1px rgba(180,100,0,.6);
+    color: #fff; font-size: 13px; text-shadow: 0 1px 1px rgba(180,100,0,.6);
   }
-  /* 絵の下の余り(ぼかした同じ絵の上)に、持ち物の札と版を置く */
-  .tfoot {
-    position: absolute; left: 0; right: 0; top: 728px; bottom: 0;
-    display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
-    padding: 0 16px calc(env(safe-area-inset-bottom) + 6px);
-  }
+  /* 持ち物の札はスタートのすぐ上、版はいちばん下 */
+  #vStart .item-toggles { position: absolute; left: 0; right: 0; bottom: calc(21.2% + 8px); margin: 0; }
+  #vStart .ver { position: absolute; left: 0; right: 0; bottom: 8px; margin: 0; text-align: center; }
   .item-toggles { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
   .item-toggles:empty { display: none; }
   .itog {
@@ -126,7 +129,7 @@
     color: #fff; background: rgba(70,50,150,.45); border: 1px solid rgba(255,255,255,.6);
   }
   .itog.on { background: #fff; color: #5a3aa8; border-color: #fff; }
-  #vStart .ver { margin-top: 6px; color: #fff; opacity: .8; text-shadow: 0 1px 2px rgba(60,30,90,.6); }
+  #vStart .ver { color: #fff; opacity: .8; text-shadow: 0 1px 2px rgba(20,40,110,.6); }
   #vChars h2 {
     margin: 6px 0 12px; font-size: 26px; color: #fff; letter-spacing: .08em;
     text-shadow: 0 2px 0 #3f6fd8, 0 4px 10px rgba(20,40,130,.4);
@@ -257,15 +260,14 @@
 
     <div class="veil on" id="vStart">
       <div class="tart">
-        <button class="hot" id="bMenu" aria-label="メニュー"></button>
         <div class="tcoin"><span class="coin-ico">★</span><span id="coinCount">0</span></div>
+        <button class="gear" id="bMenu" aria-label="メニュー"><svg viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="#fff" d="M10.3 1.5h3.4l.5 2.7a8 8 0 0 1 2 1.2l2.6-.9 1.7 2.9-2.1 1.8a8 8 0 0 1 0 2.4l2.1 1.8-1.7 2.9-2.6-.9a8 8 0 0 1-2 1.2l-.5 2.7h-3.4l-.5-2.7a8 8 0 0 1-2-1.2l-2.6.9-1.7-2.9 2.1-1.8a8 8 0 0 1 0-2.4L3.5 7.4l1.7-2.9 2.6.9a8 8 0 0 1 2-1.2zM12 8.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2z"/></svg></button>
         <button class="hot" id="bStart" aria-label="スタート">スタート</button>
         <button class="hot" id="bChars" aria-label="キャラ選択">キャラ選択</button>
         <button class="hot" id="bShop" aria-label="ショップ">ショップ</button>
-      </div>
-      <div class="tfoot">
         <div class="item-toggles" id="itemToggles"></div>
-        <div class="ver" id="ver">版 2026-09-24l</div>
+        <div class="ver" id="ver">版 2026-09-24m</div>
       </div>
     </div>
 
@@ -787,7 +789,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-09-24l';
+  var VERSION = '版 2026-09-24m';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -808,7 +810,7 @@
     cv.width = Math.round(W * dpr);
     cv.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    sunImg = null; floorImg = null;
+    sunImg = null;
     renderDiag();
   }
 
@@ -2419,68 +2421,19 @@
 
   // ===== タイトルの絵 =====
   // 青空から夕焼けへ抜ける明るい空。もこもこの雲・きらめき・遠くの街。止まった絵なので一度だけ描く
-  // いただいた絵をそのまま使う。.tart の箱(CSS)と同じ位置・大きさに描く
-  var ART_W = 452, ART_H = 678, ART_TOP = 50;
+  // いただいた縦長の絵(画面と同じ縦横比)を、画面いっぱいに敷く
   var titleImg = new Image();
   titleImg.onload = function () { if (!run && !paused) title(); };
-  titleImg.src = 'title.jpg';
-  // 雲の床: 丸を重ねて、上は白く下は藤色〜桃色。一度だけ作る
-  var floorImg = null;
-  function cloudFloor() {
-    var fw = W, fh = H - (ART_TOP + ART_H * .8) - 20;
-    if (floorImg && floorImg.w === fw && floorImg.h === fh) return floorImg.c;
-    var seed = 7;
-    function R() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
-    var c = sprite(fw, fh, function (g) {
-      [[.05, '#f7e4f4', '#d6a6dc', 36], [.35, '#fff1f8', '#e7b5dc', 44], [.65, '#ffffff', '#efc6e6', 52]].forEach(function (row) {
-        var cy = fh * row[0] + 30, rr = row[3];
-        g.beginPath();
-        for (var x = -rr; x < fw + rr; x += rr * (1 + R() * .5)) {
-          var r = rr * (.8 + R() * .5), y = cy + (R() - .5) * rr * .5;
-          g.moveTo(x + r, y); g.arc(x, y, r, 0, 6.2832);
-        }
-        g.rect(-10, cy, fw + 20, fh);
-        var gr = g.createLinearGradient(0, cy - rr, 0, cy + rr * 1.2);
-        gr.addColorStop(0, row[1]); gr.addColorStop(1, row[2]);
-        g.fillStyle = gr; g.fill();
-      });
-    });
-    floorImg = { w: fw, h: fh, c: c };
-    return c;
-  }
+  titleImg.src = 'title-v2.jpg';
   function title() {
     // ゲームが空の色を入れ直せるよう、覚えている色を忘れさせる
-    skyCss = ''; cv.style.background = '#8a86e0';
+    skyCss = ''; cv.style.background = '#3f8ff0';
     ctx.clearRect(0, 0, W, H);
     if (!titleImg.naturalWidth) return;
-    // 絵の上の余りは、絵の上端の空をぼかして引き伸ばす。
-    // ぼかしは小さく縮めてから引き伸ばして作る(canvas の filter は iOS の Safari で効かない)
-    var tw = 28, th = 8, tiny = document.createElement('canvas');
-    tiny.width = tw; tiny.height = th;
-    var tg = tiny.getContext('2d');
-    tg.imageSmoothingQuality = 'high';
-    // 上端 24px だけを使う(それより下には歯車とコインが描いてあり、ぼかすと黄色いしみになる)
-    tg.drawImage(titleImg, 0, 0, 1024, 24, 0, 0, tw, th);
+    var iw = titleImg.naturalWidth, ih = titleImg.naturalHeight;
+    var s = Math.max(W / iw, H / ih);
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(tiny, 0, 0, tw, th, (W - ART_W) / 2, 0, ART_W, ART_TOP + 30);
-    // 下の余りは、絵のいちばん下の雲に続くもこもこ雲を敷く
-    // (下端の帯を伸ばすと、ビルの縦の線がそのまま縦の筋になった。絵全体をぼかすと、描いてあるボタンがぼやけて2つ目に見えた)
-    var y0 = ART_TOP + ART_H * .8;
-    var fl = ctx.createLinearGradient(0, y0, 0, H);
-    fl.addColorStop(0, '#d9a9d8'); fl.addColorStop(1, '#b8a6ea');
-    ctx.fillStyle = fl; ctx.fillRect(0, y0, W, H - y0);
-    ctx.drawImage(cloudFloor(), 0, y0 + 20, W, H - y0 - 20);
-    // くっきりした絵。上下のふちだけぼかしへなじませる(上は歯車にかからないよう短く)
-    var art = sprite(ART_W, ART_H, function (g) {
-      g.imageSmoothingQuality = 'high';
-      g.drawImage(titleImg, 0, 0, ART_W, ART_H);
-      g.globalCompositeOperation = 'destination-in';
-      var gr = g.createLinearGradient(0, 0, 0, ART_H);
-      gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(.012, '#000');
-      gr.addColorStop(.9, '#000'); gr.addColorStop(1, 'rgba(0,0,0,0)');
-      g.fillStyle = gr; g.fillRect(0, 0, ART_W, ART_H);
-    });
-    ctx.drawImage(art, (W - ART_W) / 2, ART_TOP, ART_W, ART_H);
+    ctx.drawImage(titleImg, (W - iw * s) / 2, (H - ih * s) / 2, iw * s, ih * s);
   }
 
   loadBest();
