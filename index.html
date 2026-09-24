@@ -789,7 +789,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-09-24m';
+  var VERSION = '版 2026-09-24n';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -2427,7 +2427,9 @@
   titleImg.src = 'title-v2.jpg';
   function title() {
     // ゲームが空の色を入れ直せるよう、覚えている色を忘れさせる
-    skyCss = ''; cv.style.background = '#3f8ff0';
+    // 単色で指定すると、あとでゲームがグラデーションに戻しても Chrome が描き直さず、
+    // 単色の青がずっと残った(指定の値は変わっているのに画面の画素が変わらない)。グラデーションで指定する
+    skyCss = ''; cv.style.background = 'linear-gradient(#3f8ff0, #3f8ff0)';
     ctx.clearRect(0, 0, W, H);
     if (!titleImg.naturalWidth) return;
     var iw = titleImg.naturalWidth, ih = titleImg.naturalHeight;
