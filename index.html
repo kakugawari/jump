@@ -352,10 +352,13 @@
   var UPDRAFT_H = 170;      // 上昇気流の柱の高さ(下端が p.y)
 
   var SKY = [
-    { m: 0,    t: [96, 78, 156],  b: [252, 168, 98] },
-    { m: 400,  t: [68, 54, 124],  b: [214, 112, 118] },
-    { m: 1000, t: [36, 32, 88],   b: [122, 64, 122] },
-    { m: 1550, t: [14, 16, 52],   b: [50, 36, 88] },
+    // 昼の街 → 青空と浮き島(〜800m) → 夕焼けの雲海(〜1250m) → 夜 → 宇宙(2000m)。タイトルの絵に合わせる
+    { m: 0,    t: [58, 140, 238], b: [168, 214, 255] },
+    { m: 450,  t: [44, 124, 232], b: [146, 200, 252] },
+    { m: 800,  t: [80, 110, 200], b: [255, 196, 160] },
+    { m: 1050, t: [96, 78, 156],  b: [252, 168, 98] },
+    { m: 1300, t: [52, 44, 110],  b: [168, 88, 128] },
+    { m: 1650, t: [14, 16, 52],   b: [50, 36, 88] },
     { m: 2050, t: [2, 3, 12],     b: [12, 14, 42] },
     { m: 5000, t: [10, 4, 32],    b: [34, 14, 70] },
     { m: 10000, t: [2, 12, 30],   b: [10, 46, 72] },
@@ -789,7 +792,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-09-24n';
+  var VERSION = '版 2026-09-24o';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -810,7 +813,7 @@
     cv.width = Math.round(W * dpr);
     cv.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    sunImg = null;
+    sunImg = null; daySunImg = null;
     renderDiag();
   }
 
@@ -829,8 +832,9 @@
     [[0, 0, .7], [-.7, .25, .45], [.7, .25, .45], [-.3, -.35, .5], [.25, -.45, .55], [.05, .3, .6], [-.95, .4, .3]],
     [[0, .05, .75], [-.5, .25, .5], [.5, .2, .55], [0, -.45, .55], [.85, .35, .35], [-.85, .35, .35]]
   ];
-  // 高さで雲の色を変える(夕焼け → 夕暮れ → 夜)
+  // 高さで雲の色を変える(昼 → 夕焼け → 夕暮れ → 夜)
   var CLOUD_TINTS = [
+    { fill: '#ffffff', line: 'rgba(205,228,255,.95)', shade: '176,206,245' },
     { fill: '#fff1e4', line: 'rgba(255,190,150,.9)', shade: '255,170,140' },
     { fill: '#fbe8f2', line: 'rgba(220,170,205,.9)', shade: '210,150,200' },
     { fill: '#eeecff', line: 'rgba(185,180,235,.9)', shade: '175,170,230' }
@@ -882,7 +886,7 @@
     stars = [];
     for (var i = 0; i < 95; i++) stars.push({ x: rnd(0, W), y: rnd(0, H * 3), r: rnd(.4, 1.6), a: rnd(.3, 1) });
     clouds = [];
-    for (var m = 60; m < 1500; m += rnd(55, 120)) {
+    for (var m = 60; m < 1650; m += rnd(55, 120)) {
       clouds.push({ x: rnd(-30, W + 30), m: m, s: rnd(.7, 1.5), a: rnd(.6, .95), sh: (Math.random() * 3) | 0, f: .82 });
     }
     for (m = 30; m < 700; m += rnd(45, 90)) {
@@ -898,8 +902,10 @@
       g.fillStyle = gr; g.fillRect(0, 0, 28, 28);
     });
     buildSpace();
-    farCityImg = buildCity(W, FAR_TOP, 120, 260, '#6d5a9e', '#8a76bb', 'rgba(255,225,170,.55)', 'rgba(255,255,255,.06)', 2);
-    nearCityImg = buildCity(W, CITY_TOP, 60, 190, '#2b2740', '#403958', 'rgba(255,214,140,.85)', 'rgba(255,255,255,.07)', 4);
+    initIslands();
+    // 昼の街: 遠くは空に溶ける水色、近くは青みの灰色。窓は明かりではなく空の映り込み
+    farCityImg = buildCity(W, FAR_TOP, 120, 260, '#9cbbe4', '#b4cdef', 'rgba(255,255,255,.45)', 'rgba(255,255,255,.12)', 3);
+    nearCityImg = buildCity(W, CITY_TOP, 60, 190, '#5a74a8', '#7089bb', 'rgba(205,232,255,.75)', 'rgba(255,255,255,.1)', 4);
     planes = [];
   }
 
@@ -926,35 +932,45 @@
     if (css !== skyCss) { skyCss = css; cv.style.background = css; }
   }
 
-  var SUN_R = 170, sunImg = null;
-  function sunSprite() {
-    if (sunImg) return sunImg;
+  var SUN_R = 170, sunImg = null, daySunImg = null;
+  function sunSprite(day) {
+    if (day ? daySunImg : sunImg) return day ? daySunImg : sunImg;
     var s = document.createElement('canvas');
     s.width = s.height = Math.ceil(SUN_R * 2 * dpr);
     var c = s.getContext('2d');
     c.scale(dpr, dpr);
     var g = c.createRadialGradient(SUN_R, SUN_R, 26, SUN_R, SUN_R, SUN_R);
-    g.addColorStop(0, 'rgba(255,205,130,.6)');
-    g.addColorStop(.45, 'rgba(255,170,110,.22)');
-    g.addColorStop(1, 'rgba(255,150,90,0)');
+    if (day) {
+      g.addColorStop(0, 'rgba(255,255,235,.75)'); g.addColorStop(.4, 'rgba(255,250,220,.22)'); g.addColorStop(1, 'rgba(255,250,220,0)');
+    } else {
+      g.addColorStop(0, 'rgba(255,205,130,.6)'); g.addColorStop(.45, 'rgba(255,170,110,.22)'); g.addColorStop(1, 'rgba(255,150,90,0)');
+    }
     c.fillStyle = g;
     c.beginPath(); c.arc(SUN_R, SUN_R, SUN_R, 0, 6.2832); c.fill();
     var core = c.createRadialGradient(SUN_R - 8, SUN_R - 8, 4, SUN_R, SUN_R, 32);
-    core.addColorStop(0, '#fff3c4'); core.addColorStop(1, '#ffd27a');
+    if (day) { core.addColorStop(0, '#ffffff'); core.addColorStop(1, '#fff4c2'); }
+    else { core.addColorStop(0, '#fff3c4'); core.addColorStop(1, '#ffd27a'); }
     c.fillStyle = core;
     c.beginPath(); c.arc(SUN_R, SUN_R, 32, 0, 6.2832); c.fill();
-    sunImg = s;
+    if (day) daySunImg = s; else sunImg = s;
     return s;
   }
   function drawSun() {
-    var fade = Math.max(0, 1 - Math.max(0, hm - 260) / 420);
-    if (fade <= .01) return;
-    var x = W * .22;
-    var y = (groundY - 300) - camY * .1;
-    if (y > H + 140 || y < -140) return;
     ctx.save();
-    ctx.globalAlpha = fade;
-    ctx.drawImage(sunSprite(), x - SUN_R, y - SUN_R, SUN_R * 2, SUN_R * 2);
+    // 昼: 右上の白い太陽。登るにつれて下へ流れて薄くなる
+    var dayA = Math.max(0, 1 - hm / 700);
+    var y = (groundY - 770) - camY * .1;
+    if (dayA > .01 && y < H + 140) {
+      ctx.globalAlpha = dayA;
+      ctx.drawImage(sunSprite(true), W * .8 - SUN_R, y - SUN_R, SUN_R * 2, SUN_R * 2);
+    }
+    // 夕焼け: 左の低い所に橙の太陽。夕焼けの雲海の間だけ見え、登るほど沈む
+    var setA = Math.max(0, Math.min(1, (hm - 820) / 150)) * Math.max(0, 1 - Math.max(0, hm - 1250) / 200);
+    if (setA > .01) {
+      ctx.globalAlpha = setA;
+      var sy = H * .6 + (hm - 1050) * .3;
+      ctx.drawImage(sunSprite(false), W * .24 - SUN_R, sy - SUN_R, SUN_R * 2, SUN_R * 2);
+    }
     ctx.restore();
   }
 
@@ -1085,7 +1101,7 @@
   }
 
   function drawStars() {
-    var a = Math.max(0, Math.min(1, (hm - 550) / 650));
+    var a = Math.max(0, Math.min(1, (hm - 1250) / 500));
     if (a <= 0) return;
     for (var i = 0; i < stars.length; i++) {
       var s = stars[i];
@@ -1105,18 +1121,110 @@
       c.x += wind * .55 * c.f;
       if (c.x < -90) c.x = W + 80;
       if (c.x > W + 90) c.x = -80;
-      var a = c.a * Math.max(0, 1 - Math.max(0, c.m - 1100) / 400);
+      var a = c.a * Math.max(0, 1 - Math.max(0, c.m - 1250) / 400);
       if (a <= .01) continue;
       ctx.globalAlpha = a;
       var w = 120 * c.s, h = 64 * c.s;
-      ctx.drawImage(cloudImg(c.m < 350 ? 0 : c.m < 800 ? 1 : 2, c.sh), c.x - w / 2, y - h / 2, w, h);
+      // 見える高さ(c.m / c.f)で色を決める。雲は遠いほどゆっくり流れるので、置いた m と見える高さは違う
+      var seen = c.m / c.f;
+      ctx.drawImage(cloudImg(seen < 750 ? 0 : seen < 1150 ? 1 : seen < 1450 ? 2 : 3, c.sh), c.x - w / 2, y - h / 2, w, h);
     }
     ctx.globalAlpha = 1;
   }
 
-  // 夕方の空にただよう、ぼんやりした光の粒
+  // 背景の遠くに浮かぶ島(飾り。当たらない)。見える高さ 150〜1150m の青空に置く。
+  // 絵をもらったら差し替える前提の、仮の描き方
+  var islandImgs = [], islands = [];
+  function islandSprite(v) {
+    var IW = 170, IH = 190;
+    return sprite(IW, IH, function (g) {
+      var cx = IW / 2, top = 70, w = [150, 118, 136][v], h = w * .62;
+      g.beginPath();
+      g.moveTo(cx - w / 2, top + 6);
+      for (var i = 0; i <= 6; i++) {
+        var u = i / 6, dip = Math.sin(u * Math.PI);
+        g.lineTo(cx - w / 2 + w * u, top + 6 + h * (.25 + dip * .75) * (.82 + Math.random() * .25));
+      }
+      g.lineTo(cx + w / 2, top + 6); g.closePath();
+      var gd = g.createLinearGradient(0, top, 0, top + h);
+      gd.addColorStop(0, '#c7b49a'); gd.addColorStop(1, '#8e8ab4');
+      g.fillStyle = gd; g.fill();
+      g.save(); g.clip();
+      g.strokeStyle = 'rgba(80,70,90,.25)'; g.lineWidth = 1;
+      for (var r = 0; r < 7; r++) {
+        var yy = top + 8 + r * 11;
+        g.beginPath(); g.moveTo(0, yy); g.lineTo(IW, yy); g.stroke();
+        for (var bx = cx - w / 2 + (r % 2) * 9; bx < cx + w / 2; bx += 18) { g.beginPath(); g.moveTo(bx, yy); g.lineTo(bx, yy + 11); g.stroke(); }
+      }
+      var sd = g.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
+      sd.addColorStop(.45, 'rgba(60,50,110,0)'); sd.addColorStop(1, 'rgba(60,50,110,.28)');
+      g.fillStyle = sd; g.fillRect(0, 0, IW, IH);
+      g.restore();
+      // 草の天板
+      var gg = g.createLinearGradient(0, top - 8, 0, top + 12);
+      gg.addColorStop(0, '#b8f07a'); gg.addColorStop(1, '#5aae44');
+      g.fillStyle = gg;
+      g.beginPath(); g.ellipse(cx, top + 2, w * .53, 9, 0, Math.PI, 0);
+      g.lineTo(cx + w * .53, top + 8);
+      for (var k = 8; k >= 0; k--) { var kx = cx - w * .53 + w * 1.06 * k / 8; g.quadraticCurveTo(kx + w * .066, top + 15 + Math.random() * 6, kx, top + 8); }
+      g.closePath(); g.fill();
+      if (v === 2) {
+        // 小さなお城
+        g.fillStyle = '#e9e2f5';
+        [[-24, 26, 12], [-6, 40, 16], [14, 30, 12]].forEach(function (t) {
+          var tx = cx + t[0], th = t[1], tw = t[2];
+          g.fillRect(tx - tw / 2, top - th, tw, th + 2);
+          g.fillStyle = '#8f7fd8';
+          g.beginPath(); g.moveTo(tx - tw / 2 - 2, top - th); g.lineTo(tx, top - th - tw * 1.2); g.lineTo(tx + tw / 2 + 2, top - th); g.closePath(); g.fill();
+          g.fillStyle = '#e9e2f5';
+        });
+        g.fillRect(cx - 30, top - 14, 56, 16);
+      } else if (v === 0) {
+        // 木を2本
+        [[-30, 16], [22, 20]].forEach(function (t) {
+          g.fillStyle = '#7a5a3a'; g.fillRect(cx + t[0] - 1.5, top - t[1] * .6, 3, t[1] * .6);
+          g.fillStyle = '#4fae4a'; g.beginPath(); g.arc(cx + t[0], top - t[1] * .7, t[1] * .45, 0, 6.2832); g.fill();
+        });
+      }
+      if (v !== 1) {
+        // 島の下から落ちる細い滝
+        var wf = g.createLinearGradient(0, top + 20, 0, IH);
+        wf.addColorStop(0, 'rgba(225,245,255,.85)'); wf.addColorStop(1, 'rgba(225,245,255,0)');
+        g.fillStyle = wf; g.fillRect(cx + w * .22, top + 14, 6, IH - top - 14);
+      }
+      // 遠いので空の色に少し溶かす
+      g.globalCompositeOperation = 'source-atop';
+      g.fillStyle = 'rgba(170,205,250,.3)'; g.fillRect(0, 0, IW, IH);
+    });
+  }
+  function initIslands() {
+    islandImgs = [0, 1, 2].map(islandSprite);
+    islands = [];
+    var side = Math.random() < .5 ? -1 : 1;
+    for (var alt = 180; alt < 1150; alt += rnd(110, 190)) {
+      var f = rnd(.28, .45);
+      islands.push({ m: alt * f, f: f, v: (Math.random() * 3) | 0, s: rnd(.55, .85) * (f / .45),
+                     x: side < 0 ? rnd(-10, W * .3) : rnd(W * .7, W + 10) });
+      side = -side;
+    }
+    islands.sort(function (a, b) { return a.f - b.f; });
+  }
+  function drawIslands() {
+    var a = Math.max(0, Math.min(1, (hm + 50) / 150)) * Math.max(0, 1 - Math.max(0, hm - 1000) / 250);
+    if (a <= .01) return;
+    ctx.globalAlpha = a;
+    for (var i = 0; i < islands.length; i++) {
+      var d = islands[i], w = 170 * d.s, h = 190 * d.s;
+      var y = mToY(d.m) - camY * d.f;
+      if (y < -h || y > H + h) continue;
+      ctx.drawImage(islandImgs[d.v], d.x - w / 2, y - h * .4, w, h);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // 夕焼けの空にただよう、ぼんやりした光の粒
   function drawBokeh() {
-    var a = Math.max(0, Math.min(1, hm / 150)) * Math.max(0, 1 - Math.max(0, hm - 900) / 500);
+    var a = Math.max(0, Math.min(1, (hm - 850) / 150)) * Math.max(0, 1 - Math.max(0, hm - 1300) / 300);
     if (a <= .01) return;
     for (var i = 0; i < bokeh.length; i++) {
       var b = bokeh[i];
@@ -1195,11 +1303,11 @@
     if (gy > H + 260) return;
     ctx.drawImage(nearCityImg, 0, gy + 24 - CITY_TOP, W, CITY_TOP + 120);
     ctx.save();
-    ctx.fillStyle = '#4a4166';
+    ctx.fillStyle = '#5a6a8e';
     ctx.fillRect(0, gy, W, 30);
-    ctx.fillStyle = '#6a5e8e';
+    ctx.fillStyle = '#8697bb';
     ctx.fillRect(0, gy, W, 4);
-    ctx.fillStyle = '#36304d';
+    ctx.fillStyle = '#44506e';
     for (var k = 0; k < 5; k++) rr(10 + k * (W / 5), gy + 11, 22, 12, 3), ctx.fill();
     ctx.strokeStyle = '#8fa3bd'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(W * .84, gy); ctx.lineTo(W * .84, gy - 34); ctx.stroke();
@@ -2235,6 +2343,7 @@
     drawSpace();
     drawStationFar();
     drawPlanes();
+    drawIslands();
     drawBokeh();
     drawClouds();
     drawCity();
