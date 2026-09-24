@@ -800,7 +800,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-09-24p';
+  var VERSION = '版 2026-09-24q';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -1946,6 +1946,8 @@
   var POSE = { normal: 0, jump: 1, land: 2 };
   var CHAR_H = 54;          // ゲーム中の「通常」ポーズの高さ(pt)
   var SPR = {};
+  // 絵を差し替えたら名前も変える(絵はキャッシュ優先で配るので、同じ名前だと古い絵が出続ける)
+  var SPRITE_FILE = { usagi: 'char-usagi.webp', kumo: 'char-kumo.webp', ninja: 'char-ninja-v2.webp', king: 'char-king.webp' };
   function loadSprites() {
     var left = CHARS.length;
     CHARS.forEach(function (c) {
@@ -1970,7 +1972,7 @@
         if (--left === 0 && !run) buildPicker();
       };
       img.onerror = function () { --left; };
-      img.src = 'char-' + c.key + '.webp';
+      img.src = SPRITE_FILE[c.key];
     });
   }
   // 絵で描けるか(読み込めていて、もとの色のとき)
