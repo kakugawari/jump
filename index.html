@@ -806,7 +806,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-09-25b';
+  var VERSION = '版 2026-09-25c';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -1472,6 +1472,10 @@
   var PLAT_FILL = { trampo: .72, trampo2: .72 }, PLAT_DOWN = { trampo: 64, trampo2: 50 };
   var platImg = new Image();
   platImg.src = 'plats-v1.webp';
+  // コンベアの帯: [左, 右, 上, 下, くり返す区間の左, 矢印の間隔](絵の中の画素)。
+  // 帯の中だけ切り抜き、矢印1つぶんの区間を並べて向きへ流す
+  var CONV_BELT = { convR: [62, 290, 16, 42, 78, 44.25], convL: [32, 285, 19, 47, 38, 50.75] };
+  var CONV_SPEED = 1.2;     // 矢印の流れる速さ(pt/コマ)
   function platArtName(p) {
     switch (p.type) {
       case BEAM: return p.y < goalY ? 'space' : 'beam';
@@ -1504,7 +1508,17 @@
     var dw = a[2] * k, dh = a[3] * ky;
     ctx.save();
     if (alpha < 1) ctx.globalAlpha = alpha;
-    ctx.drawImage(platImg, a[0], a[1], a[2], a[3], x + p.w / 2 - dw / 2, y + dy - a[4] * ky, dw, dh);
+    var ox = x + p.w / 2 - dw / 2, oy = y + dy - a[4] * ky;
+    ctx.drawImage(platImg, a[0], a[1], a[2], a[3], ox, oy, dw, dh);
+    var B = CONV_BELT[name];
+    if (B) {
+      var P = B[5], bh = B[3] - B[2];
+      var off = ((frame * CONV_SPEED / k * p.dir) % P + P) % P;
+      ctx.beginPath(); ctx.rect(ox + B[0] * k, oy + B[2] * ky, (B[1] - B[0]) * k, bh * ky); ctx.clip();
+      for (var sx = B[0] - P + off; sx < B[1]; sx += P) {
+        ctx.drawImage(platImg, a[0] + B[4], a[1] + B[2], P, bh, ox + sx * k, oy + B[2] * ky, P * k + .5, bh * ky);
+      }
+    }
     ctx.restore();
     return true;
   }
