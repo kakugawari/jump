@@ -48,7 +48,8 @@
      位置は transform だけで動かす(毎コマ描き直さず、合成だけで済む) */
   /* 宇宙ステーションより上の背景(space-bg.jpg 941x1671)。ステージの絵の奥に敷き、2000m を過ぎて
      ステージの絵が下へ流れて消えると現れる */
-  #spaceimg { position: absolute; left: 0; top: 0; height: auto; transform-origin: 0 0; opacity: 0; pointer-events: none; }
+  /* 10000m(星の港)より上は、明るい宇宙の絵(space2-bg.jpg)を手前に重ねて切り替える */
+  .spimg { position: absolute; left: 0; top: 0; height: auto; transform-origin: 0 0; opacity: 0; pointer-events: none; }
   #bgimg {
     position: absolute; left: 0; top: 0; width: 100%; height: auto; transform-origin: 50% 0; opacity: 0; pointer-events: none;
     /* 2000m より上で絵が下へ流れると上端が見える。くっきりした横線にならないよう、上端をぼかす */
@@ -260,7 +261,8 @@
 <body>
 <div id="stage">
   <div id="board">
-    <img id="spaceimg" alt="" aria-hidden="true">
+    <img id="spaceimg" class="spimg" alt="" aria-hidden="true">
+    <img id="space2img" class="spimg" alt="" aria-hidden="true">
     <img id="bgimg" alt="" aria-hidden="true">
     <canvas id="cv"></canvas>
     <button id="bPause" class="pausebtn" aria-label="一時停止">❚❚</button>
@@ -810,7 +812,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-09-25e';
+  var VERSION = '版 2026-09-25f';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -890,26 +892,45 @@
     bgEl.style.transform = 'translate3d(0,' + y.toFixed(1) + 'px,0) scale(' + BG_SCALE + ')';
     bgEl.style.opacity = a.toFixed(2);
   }
-  function hideBg() { bgKey = ''; bgEl.style.opacity = '0'; spKey = ''; spEl.style.opacity = '0'; }
-
-  // 宇宙の絵: 縦を画面の 1.1倍にそろえ(左右は少し切れる)、2000m〜20000m で下端から上端へごくゆっくり流す。
-  // 遠いので動きは小さくし、登っている感じは手前の星と流れ星で出す
-  var SP_SCALE = 1.1, SP_FROM = BG_TOP_M, SP_TO = 20000, spKey = '';
-  var spEl = $('spaceimg');
-  spEl.src = 'space-bg.jpg';
-  function drawSpaceBg() {
-    if (!spEl.naturalWidth) return;
-    var on = hm > BG_TOP_M - 200;
-    var sh = H * SP_SCALE, sw = sh * spEl.naturalWidth / spEl.naturalHeight;
-    var p = Math.max(0, Math.min(1, (hm - SP_FROM) / (SP_TO - SP_FROM)));
-    var x = (W - sw) / 2, y = -(sh - H) * (1 - p);
-    var key = on ? x.toFixed(1) + ':' + y.toFixed(1) : 'off';
-    if (key === spKey) return;
-    spKey = key;
-    spEl.style.opacity = on ? '1' : '0';
-    spEl.style.width = sw.toFixed(1) + 'px';
-    spEl.style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0)';
+  function hideBg() {
+    bgKey = ''; bgEl.style.opacity = '0';
+    SPACES.forEach(function (L) { L.key = ''; L.el.style.opacity = '0'; });
   }
+
+  // 宇宙の絵: 縦を画面の 1.1倍にそろえ(左右は少し切れる)、受け持つ高さのあいだに下端から上端へごくゆっくり流す。
+  // 遠いので動きは小さくし、登っている感じは手前の星と流れ星で出す。
+  // 2枚目(明るい宇宙)は星の港(10000m)に近づくと手前に重なり、重なり切ったら奥の1枚目は隠す
+  var SP_SCALE = 1.1;
+  var SPACES = [
+    { el: $('spaceimg'), src: 'space-bg.jpg', from: BG_TOP_M, to: 10000, fadeIn: null, key: '' },
+    { el: $('space2img'), src: 'space2-bg.jpg', from: 10000, to: 40000, fadeIn: [9600, 10000], key: '' }
+  ];
+  SPACES.forEach(function (L) { L.el.src = L.src; });
+  function spaceLayerAlpha(k) {
+    var L = SPACES[k];
+    if (hm <= BG_TOP_M - 200) return 0;
+    var a = L.fadeIn ? Math.max(0, Math.min(1, (hm - L.fadeIn[0]) / (L.fadeIn[1] - L.fadeIn[0]))) : 1;
+    // 手前の絵が重なり切っていたら、奥は隠す(重ねたまま合成しない)
+    if (k + 1 < SPACES.length && spaceLayerAlpha(k + 1) >= 1) a = 0;
+    return a;
+  }
+  function drawSpaceBg() {
+    for (var k = 0; k < SPACES.length; k++) {
+      var L = SPACES[k], el = L.el;
+      if (!el.naturalWidth) continue;
+      var a = spaceLayerAlpha(k);
+      var sh = H * SP_SCALE, sw = sh * el.naturalWidth / el.naturalHeight;
+      var p = Math.max(0, Math.min(1, (hm - L.from) / (L.to - L.from)));
+      var x = (W - sw) / 2, y = -(sh - H) * (1 - p);
+      var key = a > 0 ? x.toFixed(1) + ':' + y.toFixed(1) + ':' + a.toFixed(2) : 'off';
+      if (key === L.key) continue;
+      L.key = key;
+      el.style.opacity = a.toFixed(2);
+      el.style.width = sw.toFixed(1) + 'px';
+      el.style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0)';
+    }
+  }
+
 
   // ===== 宇宙 =====
   // 星雲・惑星・地球は宇宙の絵(space-bg.jpg)に描いてある。ここでは手前で動く星と流れ星だけ持つ
