@@ -812,7 +812,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-09-25f';
+  var VERSION = '版 2026-09-25g';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -1092,6 +1092,23 @@
     return v;
   }
 
+  // 横幅 w の足場を、ほかの足場と横に重ならない位置に置く。絵は判定より左右に幅の2割ほどはみ出すので、
+  // そのぶんと隙間 8pt を空ける。何度か試して見つからなければ null。fixedX を渡すと、その位置で重ならないかだけ見る。
+  // 左右に動く足場が近くにあるときは、どこに置いてもいつか重なるので null
+  var recentSpine = [], recentBonus = [], afterMile = false;   // 近くの道すじと、近くのおまけ
+  function freeX(w, others, fixedX) {
+    for (var tries = 0; tries < (fixedX === undefined ? 12 : 1); tries++) {
+      var x = fixedX === undefined ? rnd(0, W - w) : fixedX, ok = true;
+      for (var i = 0; i < others.length; i++) {
+        var o = others[i];
+        if (!o || o.w >= W - 1) continue;
+        if (o.type === GONDOLA) return null;   // 左右に動く足場は端から端まで往復するので、近くには置けない
+        if (x - w * .2 < o.x + o.w * 1.2 + 8 && o.x - o.w * .2 < x + w * 1.2 + 8) { ok = false; break; }
+      }
+      if (ok) return x;
+    }
+    return null;
+  }
   function fillUpTo(topY) {
     var base = W * PW;
     while (genY > topY) {
@@ -1099,6 +1116,7 @@
       if (genY - mileY <= (genY < goalY ? SAFE_GAP_LOW : SAFE_GAP)) {
         var st = mk(0, mileY, mileIdx === 0 ? STATION : MILE, W);
         st.h = 18; st.mi = mileIdx; plats.push(st);
+        afterMile = true;   // 区切りのすぐ上には、おまけを置かない(絵が区切りの上面に触れる)
         genY = mileY;
         mileIdx++; mileY = mToY(mileAt(mileIdx));
         continue;
@@ -1113,12 +1131,36 @@
       var sp = mk(rnd(0, W - w), ny, t, w);
       sp.sp *= 1 + .15 * L;
       plats.push(sp);
-
-      if (g > 54 && Math.random() < (m < 300 ? .25 : .52)) {
-        var bt = m >= 300 && Math.random() < .2 ? UPDRAFT : bonusType(m);
-        var bw = bt === UPDRAFT ? 56 : base * wmul(m, bt) * .88 * thin;
-        plats.push(mk(rnd(0, W - bw), ny + g * (.35 + Math.random() * .3), bt, bw));
+      // 道すじは届く間隔の保証があるので動かさない。先に置いたおまけと重なったら、おまけの方を取り除く
+      for (var bi = recentBonus.length - 1; bi >= 0; bi--) {
+        var ob = recentBonus[bi];
+        if (Math.abs(ob.y - sp.y) < 140 && freeX(ob.w, [sp], ob.x) === null) {
+          var at = plats.indexOf(ob);
+          if (at >= 0) plats.splice(at, 1);
+          recentBonus.splice(bi, 1);
+        }
       }
+
+      // おまけの足場は、上下の道すじの足場と横に重ならない所にだけ置く(置けなければ置かない)。
+      // 雲が道すじの真上に重なると、降りてきたところで雲に乗って低くしか跳べず、次へ届かなくなった
+      // 置く確率は、重なって取りやめるぶんを見込んで少し高めにし、おまけの数を前(重なりを許していた頃)とそろえた
+      if (!afterMile && g > 54 && Math.random() < (m < 300 ? .5 : 1)) {
+        var bt = m >= 300 && Math.random() < .2 ? UPDRAFT : bonusType(m);
+        // 幅は mk() と同じく 44pt 未満にはしない(細いまま位置を決めると、広げたぶん重なった)
+        var bw = Math.max(44, bt === UPDRAFT ? 56 : base * wmul(m, bt) * .88 * thin);
+        var bx = freeX(bw, recentSpine.concat([sp]));
+        if (bx !== null) {
+          var bp = mk(bx, ny + g * (.35 + Math.random() * .3), bt, bw);
+          bp.bonus = true;
+          plats.push(bp);
+          recentBonus.push(bp);
+        }
+      }
+      recentSpine.push(sp);
+      // 近くの物は個数ではなく上下の距離(200pt 以内)で覚える。個数で切ると、おまけが続いたときに漏れた
+      recentSpine = recentSpine.filter(function (o) { return o.y - sp.y < 200; });
+      recentBonus = recentBonus.filter(function (o) { return o.y - sp.y < 200; });
+      afterMile = false;
       genY = ny;
     }
   }
@@ -2300,6 +2342,7 @@
     g.h = 30; g.ground = true;
     plats.push(g);
     genY = groundY;
+    recentSpine = []; recentBonus = []; afterMile = false;
     fillUpTo(-H * .6);
     pl = newPlayer();
     vStart.classList.remove('on');
