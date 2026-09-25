@@ -806,7 +806,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-09-25a';
+  var VERSION = '版 2026-09-25b';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -1247,6 +1247,7 @@
     if (p.type === GLASS && p.crack) { x += rnd(-1.5, 1.5); y += rnd(-1, 1); }
 
     if (p.type === MILE) { drawMile(p, y); return; }
+    if (drawPlatArt(p, x, y)) return;
 
     // 宇宙ステーション（ゴール足場）
     if (p.type === STATION) {
@@ -1445,6 +1446,67 @@
       slab(x, y, p.w, '#a8f0d6', '#35a58a', '#2a8570', SLAB_H / 2);
     }
     ctx.restore();
+  }
+
+  // ===== 足場の絵 =====
+  // plats-v1.webp に 13枚を詰めてある。[x, y, 幅, 高さ, 上面の高さ, 上面の幅の割合]
+  // 上面の高さ = キャラが乗る線(絵の上端からの画素)。上面の幅の割合 = 上面の幅 / 絵の幅
+  var PLAT_ART = {
+    beam: [4,4,330,205,14, 0.74],
+    gondola: [338,4,330,78,36, 0.8],
+    trampo: [672,4,244,249,3, 0.61],
+    trampo2: [4,257,200,149,0, 0.6],
+    boost: [208,257,330,336,153, 0.9],
+    convR: [542,257,330,100,2, 0.9],
+    convL: [4,597,330,108,4, 0.89],
+    glass: [338,597,328,134,1, 0.77],
+    glass2: [670,597,293,131,1, 0.75],
+    crumble: [4,735,274,192,7, 0.77],
+    cloud: [282,735,307,159,12, 0.8],
+    holo: [593,735,283,114,9, 0.85],
+    space: [4,931,312,124,3, 0.75]
+  };
+  var PLAT_TOP_FILL = .9;   // 絵の上面が当たり判定の幅の何割になるか(判定を少し広めにして、ふちで落ちないように)
+  var PLAT_MAX_DOWN = 44;   // 上面より下に垂れる部分の高さの上限(足場どうしの上下の間隔は狭い所で約64pt)
+  // ばねは台より土台が広く背も高いので、台を判定より小さめにし、下に垂れるのも少し許す
+  var PLAT_FILL = { trampo: .72, trampo2: .72 }, PLAT_DOWN = { trampo: 64, trampo2: 50 };
+  var platImg = new Image();
+  platImg.src = 'plats-v1.webp';
+  function platArtName(p) {
+    switch (p.type) {
+      case BEAM: return p.y < goalY ? 'space' : 'beam';
+      case GONDOLA: return 'gondola';
+      // ばね: ふだんは縮んだ絵(背が低い)、乗った瞬間だけ伸びた絵にして、はずむ動きに見せる
+      case TRAMPO: return p.hitT > 0 ? 'trampo' : 'trampo2';
+      case BOOST: return 'boost';
+      case CONVEYOR: return p.dir > 0 ? 'convR' : 'convL';
+      case GLASS: return p.crack ? 'glass2' : 'glass';
+      case CRUMBLE: return 'crumble';
+      case CLOUD: return 'cloud';
+      case HOLO: return 'holo';
+    }
+    return null;
+  }
+  // 足場を絵で描く。描けたら true(絵が読めていない・絵の無い種類は false で、図形で描く)
+  function drawPlatArt(p, x, y) {
+    var name = platArtName(p);
+    if (!name || !platImg.naturalWidth) return false;
+    var a = PLAT_ART[name];
+    var k = p.w * (PLAT_FILL[name] || PLAT_TOP_FILL) / a[5] / a[2];                       // 横の縮尺
+    var ky = Math.min(k, (PLAT_DOWN[name] || PLAT_MAX_DOWN) / Math.max(1, a[3] - a[4])); // 縦は、下に垂れすぎないよう縮めることがある
+    var dy = 0, alpha = 1;
+    if (p.type === CLOUD) { dy = p.dip * 6; ky *= 1 - p.dip * .12; }
+    if (p.type === CRUMBLE && p.fallT > 0 && p.fallT <= 18) x += rnd(-1.5, 1.5);
+    if (p.type === HOLO) {
+      if (!holoOn(p)) alpha = .22;
+      else if ((frame + ((p.ph * 31) | 0)) % 165 > 80 && frame % 6 < 3) alpha = .5;
+    }
+    var dw = a[2] * k, dh = a[3] * ky;
+    ctx.save();
+    if (alpha < 1) ctx.globalAlpha = alpha;
+    ctx.drawImage(platImg, a[0], a[1], a[2], a[3], x + p.w / 2 - dw / 2, y + dy - a[4] * ky, dw, dh);
+    ctx.restore();
+    return true;
   }
 
   // ===== プレイヤー =====
@@ -2106,7 +2168,7 @@
           pl.y = p.y - pl.h;
           pl.sq = .55;
           pl.landT = 9;
-          if (p.type === TRAMPO) { pl.vy = TF; pl.sq = .85; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ff8fbd', 7); }
+          if (p.type === TRAMPO) { pl.vy = TF; pl.sq = .85; p.hitT = 10; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ff8fbd', 7); }
           else if (p.type === BOOST) { pl.vy = BF; pl.sq = .9; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffe08a', 14); }
           else if (p.type === GLASS) { p.crack = true; pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, '#cfe6f7', 4); }
           else if (p.type === CLOUD) { p.dip = 1; pl.vy = JMP * .6; pl.sq = .8; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffffff', 6); }
@@ -2127,6 +2189,7 @@
     for (var j = 0; j < plats.length; j++) {
       var q = plats[j];
       if (q.dead) continue;
+      if (q.hitT > 0) q.hitT--;   // ばねが縮んだ絵を出す残り
       if (q.type === GONDOLA) {
         q.x += q.dir * q.sp;
         if (q.x < 0 || q.x + q.w > W) q.dir *= -1;
