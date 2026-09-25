@@ -1,5 +1,5 @@
-const CACHE = 'sky-hopper-v8';
-const ASSETS = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'title-v2.jpg', 'char-usagi.webp', 'char-kumo.webp', 'char-ninja-v2.webp', 'char-king.webp', 'stage-bg.jpg', 'plats-v1.webp', 'facilities-v1.webp'];
+const CACHE = 'sky-hopper-v9';
+const ASSETS = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'title-v2.jpg', 'char-usagi.webp', 'char-kumo.webp', 'char-ninja-v2.webp', 'char-king.webp', 'stage-bg.jpg', 'plats-v1.webp', 'facilities-v1.webp', 'space-bg.jpg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));

@@ -46,6 +46,9 @@
   #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   /* ステージの背景の絵(stage-bg.jpg 852x1846、画面と同じ比)。1.5倍に広げて上下に流す。
      位置は transform だけで動かす(毎コマ描き直さず、合成だけで済む) */
+  /* 宇宙ステーションより上の背景(space-bg.jpg 941x1671)。ステージの絵の奥に敷き、2000m を過ぎて
+     ステージの絵が下へ流れて消えると現れる */
+  #spaceimg { position: absolute; left: 0; top: 0; height: auto; transform-origin: 0 0; opacity: 0; pointer-events: none; }
   #bgimg {
     position: absolute; left: 0; top: 0; width: 100%; height: auto; transform-origin: 50% 0; opacity: 0; pointer-events: none;
     /* 2000m より上で絵が下へ流れると上端が見える。くっきりした横線にならないよう、上端をぼかす */
@@ -257,6 +260,7 @@
 <body>
 <div id="stage">
   <div id="board">
+    <img id="spaceimg" alt="" aria-hidden="true">
     <img id="bgimg" alt="" aria-hidden="true">
     <canvas id="cv"></canvas>
     <button id="bPause" class="pausebtn" aria-label="一時停止">❚❚</button>
@@ -806,7 +810,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-09-25d';
+  var VERSION = '版 2026-09-25e';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -871,8 +875,8 @@
   }
 
   // ステージの背景の絵: 0m で絵の下端(朝日と雲海)、BG_TOP_M で上端(宇宙)が見えるよう、登るにつれて流す。
-  // それより上では、同じ速さで下へ流しながら薄くして、図形で描く宇宙へつなぐ
-  var BG_SCALE = 1.5, BG_TOP_M = 2000, BG_FADE_M = 700, bgKey = '';
+  // それより上では、同じ速さで下へ流しながら 400m で薄くして、奥の宇宙の絵へつなぐ
+  var BG_SCALE = 1.5, BG_TOP_M = 2000, BG_FADE_M = 400, bgKey = '';
   var bgEl = $('bgimg');
   bgEl.src = 'stage-bg.jpg';
   function drawBg() {
@@ -886,74 +890,33 @@
     bgEl.style.transform = 'translate3d(0,' + y.toFixed(1) + 'px,0) scale(' + BG_SCALE + ')';
     bgEl.style.opacity = a.toFixed(2);
   }
-  function hideBg() { bgKey = ''; bgEl.style.opacity = '0'; }
+  function hideBg() { bgKey = ''; bgEl.style.opacity = '0'; spKey = ''; spEl.style.opacity = '0'; }
+
+  // 宇宙の絵: 縦を画面の 1.1倍にそろえ(左右は少し切れる)、2000m〜20000m で下端から上端へごくゆっくり流す。
+  // 遠いので動きは小さくし、登っている感じは手前の星と流れ星で出す
+  var SP_SCALE = 1.1, SP_FROM = BG_TOP_M, SP_TO = 20000, spKey = '';
+  var spEl = $('spaceimg');
+  spEl.src = 'space-bg.jpg';
+  function drawSpaceBg() {
+    if (!spEl.naturalWidth) return;
+    var on = hm > BG_TOP_M - 200;
+    var sh = H * SP_SCALE, sw = sh * spEl.naturalWidth / spEl.naturalHeight;
+    var p = Math.max(0, Math.min(1, (hm - SP_FROM) / (SP_TO - SP_FROM)));
+    var x = (W - sw) / 2, y = -(sh - H) * (1 - p);
+    var key = on ? x.toFixed(1) + ':' + y.toFixed(1) : 'off';
+    if (key === spKey) return;
+    spKey = key;
+    spEl.style.opacity = on ? '1' : '0';
+    spEl.style.width = sw.toFixed(1) + 'px';
+    spEl.style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0)';
+  }
 
   // ===== 宇宙 =====
-  // 動かない絵(星雲・惑星・月・地球)は最初に一度だけ描いて、毎フレームは貼るだけ
-  var NEB_TINTS = ['150,90,255', '60,200,220', '255,110,190'];
-  var PLANET_TINTS = [['#ffc27a', '#d9733a'], ['#8ce8d8', '#2f8f9a'], ['#d2adff', '#7a4fd0']];
-  var nebImgs = [], planetImgs = [], moonImg = null, earthImg = null;
-  var nebulae = [], bigStars = [], shoots = [], shootT = 200;
+  // 星雲・惑星・地球は宇宙の絵(space-bg.jpg)に描いてある。ここでは手前で動く星と流れ星だけ持つ
+  var bigStars = [], shoots = [], shootT = 200;
   function buildSpace() {
-    nebImgs = NEB_TINTS.map(function (c) {
-      return sprite(340, 240, function (g) {
-        // ぼかしの円が絵の外へはみ出すと、端で切られて直線の縁が出る。必ず内側に収める
-        for (var i = 0; i < 7; i++) {
-          var x = 110 + Math.random() * 120, y = 95 + Math.random() * 50;
-          var r = Math.min(40 + Math.random() * 70, x, 340 - x, y, 240 - y) - 2;
-          var gr = g.createRadialGradient(x, y, 0, x, y, r);
-          gr.addColorStop(0, 'rgba(' + c + ',.26)'); gr.addColorStop(1, 'rgba(' + c + ',0)');
-          g.fillStyle = gr; g.fillRect(0, 0, 340, 240);
-        }
-      });
-    });
-    planetImgs = PLANET_TINTS.map(function (c) {
-      return sprite(200, 120, function (g) {
-        var cx = 100, cy = 60, r = 36;
-        g.strokeStyle = 'rgba(255,240,220,.5)'; g.lineWidth = 6;
-        g.beginPath(); g.ellipse(cx, cy, 84, 19, -.25, Math.PI, 2 * Math.PI); g.stroke();
-        var gr = g.createRadialGradient(cx - 13, cy - 13, 4, cx, cy, r);
-        gr.addColorStop(0, c[0]); gr.addColorStop(1, c[1]);
-        g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, 6.2832); g.fill();
-        g.save(); g.beginPath(); g.arc(cx, cy, r, 0, 6.2832); g.clip();
-        g.fillStyle = 'rgba(255,255,255,.13)';
-        for (var i = 0; i < 3; i++) g.fillRect(cx - r, cy - 18 + i * 13, r * 2, 5);
-        g.restore();
-        g.beginPath(); g.ellipse(cx, cy, 84, 19, -.25, 0, Math.PI); g.stroke();
-      });
-    });
-    moonImg = sprite(64, 64, function (g) {
-      var gr = g.createRadialGradient(24, 24, 3, 32, 32, 26);
-      gr.addColorStop(0, '#f4f2ea'); gr.addColorStop(1, '#a9a7b8');
-      g.fillStyle = gr; g.beginPath(); g.arc(32, 32, 26, 0, 6.2832); g.fill();
-      g.fillStyle = 'rgba(120,118,140,.35)';
-      [[22, 26, 5], [38, 20, 4], [36, 40, 7], [20, 42, 3]].forEach(function (c) { g.beginPath(); g.arc(c[0], c[1], c[2], 0, 6.2832); g.fill(); });
-    });
-    earthImg = sprite(W, 260, function (g) {
-      var R = 1100, cx = W / 2, cy = 50 + R;
-      var at = g.createRadialGradient(cx, cy, R - 6, cx, cy, R + 46);
-      at.addColorStop(0, 'rgba(120,200,255,.6)'); at.addColorStop(1, 'rgba(120,200,255,0)');
-      g.fillStyle = at; g.fillRect(0, 0, W, 260);
-      var gr = g.createLinearGradient(0, 50, 0, 260);
-      gr.addColorStop(0, '#5cb4f0'); gr.addColorStop(.35, '#2a6fc0'); gr.addColorStop(1, '#0f3470');
-      g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, R, 0, 6.2832); g.fill();
-      g.save(); g.beginPath(); g.arc(cx, cy, R, 0, 6.2832); g.clip();
-      g.fillStyle = '#58b877';
-      [[W * .18, 120, 70, 22], [W * .62, 95, 90, 18], [W * .9, 170, 60, 26], [W * .4, 200, 80, 20]].forEach(function (c) {
-        g.beginPath(); g.ellipse(c[0], c[1], c[2], c[3], -.15, 0, 6.2832); g.fill();
-      });
-      g.fillStyle = 'rgba(255,255,255,.75)';
-      [[W * .3, 80, 80, 6], [W * .75, 140, 100, 8], [W * .12, 180, 60, 5], [W * .55, 225, 120, 9]].forEach(function (c) {
-        g.beginPath(); g.ellipse(c[0], c[1], c[2], c[3], -.1, 0, 6.2832); g.fill();
-      });
-      g.restore();
-      g.strokeStyle = 'rgba(200,240,255,.85)'; g.lineWidth = 2;
-      g.beginPath(); g.arc(cx, cy, R, Math.PI * 1.4, Math.PI * 1.6); g.stroke();
-    });
-    nebulae = [];
-    for (var i = 0; i < 5; i++) nebulae.push({ x: rnd(-60, W - 280), y: i * H * .8 + rnd(0, H * .4), k: i % 3, s: rnd(.9, 1.5) });
     bigStars = [];
-    for (i = 0; i < 26; i++) bigStars.push({ x: rnd(0, W), y: rnd(0, H * 3), r: rnd(1, 2.2), ph: rnd(0, 6.28) });
+    for (var i = 0; i < 26; i++) bigStars.push({ x: rnd(0, W), y: rnd(0, H * 3), r: rnd(1, 2.2), ph: rnd(0, 6.28) });
     shoots = [];
   }
   function spaceAlpha() { return Math.max(0, Math.min(1, (hm - BG_TOP_M) / 600)); }
@@ -974,23 +937,6 @@
     var a = spaceAlpha();
     if (a <= 0) return;
     var i;
-    for (i = 0; i < nebulae.length; i++) {
-      var n = nebulae[i], ny = wrapY(n.y - camY * .12, H * 4) - H * 1.2;
-      if (ny < -300 || ny > H + 60) continue;
-      ctx.globalAlpha = a;
-      ctx.drawImage(nebImgs[n.k], n.x, ny, 340 * n.s, 240 * n.s);
-    }
-    // 惑星と月: ずっと遠いので、とてもゆっくり流れる
-    var py = wrapY(-camY * .05, H * 2.4) - 140;
-    if (py > -140 && py < H + 20) {
-      ctx.globalAlpha = a * .95;
-      ctx.drawImage(planetImgs[zoneLv(hm) % 3], W * .52, py, 200, 120);
-    }
-    var my = wrapY(-camY * .035 + H * 1.3, H * 2.8) - 80;
-    if (my > -80 && my < H + 20) {
-      ctx.globalAlpha = a * .9;
-      ctx.drawImage(moonImg, W * .08, my, 64, 64);
-    }
     for (i = 0; i < bigStars.length; i++) {
       var b = bigStars[i], by = wrapY(b.y - camY * .3, H * 3) - H;
       if (by < -8 || by > H + 8) continue;
@@ -1004,12 +950,6 @@
       gr.addColorStop(0, 'rgba(255,255,255,' + (s.life * a) + ')'); gr.addColorStop(1, 'rgba(255,255,255,0)');
       ctx.globalAlpha = 1; ctx.strokeStyle = gr; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.vx * 8, s.y - s.vy * 8); ctx.stroke();
-    }
-    // 地球: ステーションを過ぎたあたりで画面の下に見え、登るにつれて沈んでいく
-    var ey = H - 170 + (hm - 2050) * .35;
-    if (ey < H) {
-      ctx.globalAlpha = Math.max(0, Math.min(1, (hm - BG_TOP_M - 150) / 300));
-      ctx.drawImage(earthImg, 0, ey, W, 260);
     }
     ctx.globalAlpha = 1;
   }
@@ -2276,6 +2216,7 @@
     ctx.clearRect(0, 0, W, H);
     drawSky();
     drawBg();
+    drawSpaceBg();
     drawStars();
     drawSpace();
     drawStationFar();
