@@ -299,6 +299,10 @@
         <div class="menu-list">
           <button class="ghost" id="bTitles">🏅 称号 <span id="titleName">称号なし</span><span class="tcount" id="titleCount"></span></button>
         </div>
+        <div class="menu-list">
+          <button class="ghost" id="bMusic"></button>
+          <button class="ghost" id="bSfx"></button>
+        </div>
         <button class="ghost" id="bMenuClose">とじる</button>
       </div>
     </div>
@@ -622,7 +626,7 @@
   function buyItem(id) {
     var it = ITEMS.filter(function (x) { return x.id === id; })[0];
     if (coins < it.price) return false;
-    coins -= it.price; stock[id]++;
+    coins -= it.price; stock[id]++; Snd.sfx('coin');
     saveCoins(); saveStock(); renderCoinUI();
     return true;
   }
@@ -654,7 +658,7 @@
     if (isOwned) return chipBtn(name, 'own', false, function () { pendingBuy = ''; equipFn(); buildShop(); });
     if (pendingBuy === id) {
       return chipBtn(name + ' を買う？', 'buy sure', coins < price, function () {
-        coins -= price; owned[id] = true; pendingBuy = '';
+        coins -= price; owned[id] = true; pendingBuy = ''; Snd.sfx('coin');
         saveCoins(); saveOwned(); equipFn(); buildShop();
       });
     }
@@ -739,14 +743,14 @@
     for (var i = 0; i < TITLES.length; i++) {
       var t = TITLES[i];
       if (titles[t.id] || score < t.m || (t.ch && t.ch !== CH.key)) continue;
-      titles[t.id] = true; runTitles.push(t.n); toastQ.push('🏅 称号「' + t.n + '」'); got = true;
+      titles[t.id] = true; runTitles.push(t.n); Snd.sfx('chime'); toastQ.push('🏅 称号「' + t.n + '」'); got = true;
     }
     if (got) saveTitles();
     for (var j = 0; j < CHARS.length; j++) {
       var c = CHARS[j];
       if (!isLocked(c) || score < c.unlockM) continue;
       owned[c.key] = true; saveOwned();
-      runUnlocks.push(c.n); toastQ.push('★ ' + c.n + 'が仲間になった！');
+      runUnlocks.push(c.n); Snd.sfx('friend'); toastQ.push('★ ' + c.n + 'が仲間になった！');
     }
   }
   function titleHow(t) { return (t.ch ? CHARS[findChar(t.ch)].n + 'で ' : '') + t.m + 'm に到達'; }
@@ -812,7 +816,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-09-25g';
+  var VERSION = '版 2026-09-26a';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -1954,6 +1958,7 @@
   // ===== じゃまもの =====
   function knock(dx, down) {
     if (invuln > 0 || rocketOn) return;
+    Snd.sfx('hit');
     if (CH.tough) {
       invuln = 45;
       pl.kx = dx * 1.1;
@@ -2179,16 +2184,20 @@
     if (pl.x > W) pl.x = -pl.w;
 
     pl.vy += (pl.y < goalY ? LOWG : G) * CH.grav;
+    var inUd = null;
     for (var u = 0; u < plats.length; u++) {
       var ud = plats[u];
       if (ud.type !== UPDRAFT) continue;
       var pcx = pl.x + pl.w / 2, pb = pl.y + pl.h;
       if (pcx > ud.x && pcx < ud.x + ud.w && pb < ud.y + 6 && pb > ud.y - UPDRAFT_H) {
+        inUd = ud;
+        if (pl.inUd !== ud) Snd.sfx('updraft');   // 風の音は、柱に入った瞬間だけ
         // 速く落ちてきても柱の中で止まれる強さ(速さ10なら約77pxで上向きに変わる)
         pl.vy = Math.max(pl.vy - (pl.y < goalY ? .55 : 1.0), -11);
         if (frame % 3 === 0) burst(pcx, pb, 'rgba(190,255,245,.9)', 1);
       }
     }
+    pl.inUd = inUd;
     if (rocketOn) {
       pl.vy = -38;
       burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffb14d', 2);
@@ -2215,26 +2224,28 @@
         if (pl.x + pl.w > p.x && pl.x < p.x + p.w && foot >= p.y && prev <= p.y) {
           if (p.type === GLASS && p.crack) {
             p.dead = true;
+            Snd.sfx('shatter');
             burst(p.x + p.w / 2, p.y, '#cfe6f7', 10);
             continue;
           }
           pl.y = p.y - pl.h;
           pl.sq = .55;
           pl.landT = 9;
-          if (p.type === TRAMPO) { pl.vy = TF; pl.sq = .85; p.hitT = 10; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ff8fbd', 7); }
-          else if (p.type === BOOST) { pl.vy = BF; pl.sq = .9; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffe08a', 14); }
-          else if (p.type === GLASS) { p.crack = true; pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, '#cfe6f7', 4); }
-          else if (p.type === CLOUD) { p.dip = 1; pl.vy = JMP * .6; pl.sq = .8; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffffff', 6); }
-          else if (p.type === CONVEYOR) { pl.vy = JMP; pl.kx = p.dir * 4.2; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffc861', 4); }
-          else if (p.type === CRUMBLE) { if (p.fallT === 0) p.fallT = 1; pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, '#c8a87a', 5); }
+          if (p.type === TRAMPO) { Snd.sfx('spring'); pl.vy = TF; pl.sq = .85; p.hitT = 10; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ff8fbd', 7); }
+          else if (p.type === BOOST) { Snd.sfx('boost'); pl.vy = BF; pl.sq = .9; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffe08a', 14); }
+          else if (p.type === GLASS) { Snd.sfx('crack'); p.crack = true; pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, '#cfe6f7', 4); }
+          else if (p.type === CLOUD) { Snd.sfx('cloud'); p.dip = 1; pl.vy = JMP * .6; pl.sq = .8; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffffff', 6); }
+          else if (p.type === CONVEYOR) { Snd.sfx('conveyor'); pl.vy = JMP; pl.kx = p.dir * 4.2; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffc861', 4); }
+          else if (p.type === CRUMBLE) { Snd.sfx('crumble'); if (p.fallT === 0) p.fallT = 1; pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, '#c8a87a', 5); }
           else if (p.type === STATION || p.type === MILE) {
             pl.vy = JMP;
             if (!p.got) {
+              Snd.sfx('fanfare');
               p.got = true; cheer = 200; cheerMi = p.mi; topMile = p.mi;
               confetti(W / 2, p.y - 50);
               if (p.type === STATION) goalGot = true;
             }
-          } else { pl.vy = JMP; }
+          } else { Snd.sfx(p.type === HOLO ? 'holo' : 'jump'); pl.vy = JMP; }
         }
       }
     }
@@ -2276,6 +2287,7 @@
   }
 
   function paint() {
+    if (run) Snd.music(hm < BG_TOP_M ? 'sky' : 'space');
     ctx.clearRect(0, 0, W, H);
     drawSky();
     drawBg();
@@ -2317,6 +2329,221 @@
     if (run) raf = requestAnimationFrame(loop);
   }
 
+  // ===== 音 =====
+  // 音の素材ファイルは使わず、Web Audio でその場で合成する。
+  // iOS は指で触った瞬間にしか音を出し始められないので、最初のタップで unlock() する。
+  // 音楽は同じメロディを場面ごとに編成を変えて流す(タイトル: 軽く / 空: 太鼓つき / 宇宙: やまびこで広く)
+  var Snd = (function () {
+    var ac = null, comp, musicBus, sfxBus, echo, noiseBuf = null, held = false;
+    // 音量は、出力を測って決めた(スマホのスピーカーで聞こえる大きさで、割れない所)
+    var MUSIC_VOL = 1.0, SFX_VOL = 1.8;
+    var pref = { music: true, sfx: true };
+    try {
+      var sv = JSON.parse(localStorage.getItem('skyJumpSound') || 'null');
+      if (sv) { pref.music = sv.music !== false; pref.sfx = sv.sfx !== false; }
+    } catch (e) {}
+    function init() {
+      if (ac) return ac;
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ac = new AC();
+      var master = ac.createGain(); master.gain.value = .8; master.connect(ac.destination);
+      // 音が重なっても割れないよう、軽く圧縮する
+      comp = ac.createDynamicsCompressor(); comp.threshold.value = -10; comp.ratio.value = 3; comp.connect(master);
+      musicBus = ac.createGain(); musicBus.gain.value = pref.music ? MUSIC_VOL : 0; musicBus.connect(comp);
+      sfxBus = ac.createGain(); sfxBus.gain.value = pref.sfx ? SFX_VOL : 0; sfxBus.connect(comp);
+      // やまびこ(宇宙の音楽で使う)
+      echo = ac.createDelay(1); echo.delayTime.value = .4;
+      var fb = ac.createGain(); fb.gain.value = .38; echo.connect(fb); fb.connect(echo);
+      var wet = ac.createGain(); wet.gain.value = .55; echo.connect(wet); wet.connect(musicBus);
+      noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+      var nd = noiseBuf.getChannelData(0);
+      for (var i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+      return ac;
+    }
+    function unlock() {
+      if (!init()) return;
+      if (ac.state !== 'running' && !held) ac.resume();
+    }
+    function live() { return ac && ac.state === 'running'; }
+    function hz(n) { return 440 * Math.pow(2, (n - 69) / 12); }
+    // 1音: 波形・音量・長さ・音程の上がり下がり
+    function tone(dest, t, f, dur, o) {
+      o = o || {};
+      var osc = ac.createOscillator(), g = ac.createGain();
+      osc.type = o.type || 'square';
+      osc.frequency.setValueAtTime(f, t);
+      if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, t + dur);
+      var v = o.vol || .2, a = o.att || .005;
+      g.gain.setValueAtTime(.0001, t);
+      g.gain.exponentialRampToValueAtTime(v, t + a);
+      g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+      osc.connect(g); g.connect(dest);
+      if (o.echo) g.connect(echo);
+      osc.start(t); osc.stop(t + dur + .03);
+    }
+    // ざらっとした音(風・割れる・崩れる・太鼓)
+    function noise(dest, t, dur, o) {
+      o = o || {};
+      var src = ac.createBufferSource(); src.buffer = noiseBuf;
+      var fl = ac.createBiquadFilter();
+      fl.type = o.type || 'bandpass'; fl.Q.value = o.q || 1;
+      fl.frequency.setValueAtTime(o.f || 1000, t);
+      if (o.to) fl.frequency.exponentialRampToValueAtTime(o.to, t + dur);
+      // いきなり最大の音量で鳴らし始めると、出だしに鋭い山ができて「プチッ」と鳴る。ごく短く立ち上げる
+      var g = ac.createGain();
+      g.gain.setValueAtTime(.0001, t);
+      g.gain.linearRampToValueAtTime(o.vol || .3, t + .003);
+      g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+      src.connect(fl); fl.connect(g); g.connect(dest);
+      src.start(t, Math.random() * .5); src.stop(t + dur + .03);
+    }
+
+    // ----- 効果音 -----
+    var FX = {
+      jump: function (t) { var k = 1 + (Math.random() - .5) * .06; tone(sfxBus, t, 420 * k, .13, { type: 'triangle', to: 820 * k, vol: .16 }); },
+      spring: function (t) {
+        tone(sfxBus, t, 180, .32, { type: 'triangle', to: 900, vol: .22 });
+        tone(sfxBus, t + .04, 360, .26, { type: 'sine', to: 1400, vol: .08 });
+      },
+      boost: function (t) {
+        noise(sfxBus, t, .7, { type: 'highpass', f: 300, to: 5000, vol: .22 });
+        tone(sfxBus, t, 160, .6, { type: 'sawtooth', to: 1300, vol: .07 });
+      },
+      crack: function (t) {
+        noise(sfxBus, t, .07, { type: 'highpass', f: 5000, vol: .3 });
+        tone(sfxBus, t, 2400, .08, { type: 'sine', vol: .08 });
+        FX.jump(t);
+      },
+      shatter: function (t) {
+        noise(sfxBus, t, .35, { type: 'highpass', f: 3500, vol: .35 });
+        for (var i = 0; i < 5; i++) tone(sfxBus, t + i * .03, 2600 + Math.random() * 2600, .12, { type: 'sine', vol: .06 });
+      },
+      crumble: function (t) {
+        noise(sfxBus, t, .3, { type: 'lowpass', f: 700, to: 140, vol: .45 });
+        FX.jump(t);
+      },
+      cloud: function (t) {
+        noise(sfxBus, t, .32, { type: 'lowpass', f: 1200, to: 260, vol: .2 });
+        tone(sfxBus, t, 330, .22, { type: 'sine', to: 220, vol: .1 });
+      },
+      conveyor: function (t) {
+        tone(sfxBus, t, 300, .12, { type: 'square', to: 620, vol: .05 });
+        noise(sfxBus, t, .14, { type: 'bandpass', f: 1800, vol: .12 });
+        FX.jump(t);
+      },
+      holo: function (t) { tone(sfxBus, t, 1200, .09, { type: 'sine', to: 1700, vol: .08 }); FX.jump(t); },
+      updraft: function (t) { noise(sfxBus, t, .7, { type: 'bandpass', f: 500, to: 1800, q: 1.2, vol: .6 }); },
+      hit: function (t) {
+        noise(sfxBus, t, .18, { type: 'lowpass', f: 1500, vol: .35 });
+        tone(sfxBus, t, 220, .2, { type: 'square', to: 90, vol: .1 });
+      },
+      rescue: function (t) { FX.spring(t); FX.boost(t + .05); },
+      fanfare: function (t) {
+        [72, 76, 79, 84].forEach(function (n, i) { tone(sfxBus, t + i * .11, hz(n), .18, { type: 'square', vol: .1 }); });
+        [72, 76, 79, 84].forEach(function (n) { tone(sfxBus, t + .44, hz(n), .8, { type: 'triangle', vol: .09 }); });
+      },
+      chime: function (t) {
+        tone(sfxBus, t, hz(88), .9, { type: 'sine', vol: .12 });
+        tone(sfxBus, t + .12, hz(91), 1.1, { type: 'sine', vol: .1 });
+      },
+      friend: function (t) {
+        [79, 84, 88, 91, 96].forEach(function (n, i) { tone(sfxBus, t + i * .09, hz(n), .5, { type: 'sine', vol: .1 }); });
+      },
+      over: function (t) {
+        [79, 76, 72, 67].forEach(function (n, i) { tone(sfxBus, t + i * .16, hz(n), .3, { type: 'triangle', vol: .14 }); });
+      },
+      click: function (t) { tone(sfxBus, t, 900, .05, { type: 'sine', vol: .12 }); },
+      coin: function (t) {
+        tone(sfxBus, t, hz(88), .1, { type: 'square', vol: .12 });
+        tone(sfxBus, t + .08, hz(93), .35, { type: 'square', vol: .12 });
+      }
+    };
+    function sfx(name) {
+      if (!pref.sfx || !live() || !FX[name]) return;
+      FX[name](ac.currentTime + .005);
+    }
+
+    // ----- 音楽 -----
+    var BPM = 112, E8 = 60 / BPM / 2;   // 8分音符の長さ(秒)
+    // 8小節。和音(アルペジオ用)、ベースの根音、メロディ [音, 8分いくつぶん](-1 は休み)
+    var PROG = [[60, 64, 67, 72], [59, 62, 67, 71], [57, 60, 64, 69], [57, 60, 65, 69],
+                [60, 64, 67, 72], [59, 62, 67, 71], [57, 60, 65, 69], [59, 62, 67, 71]];
+    var ROOT = [36, 43, 45, 41, 36, 43, 41, 43];
+    var MEL = [[76, 2], [79, 2], [84, 2], [79, 2], [74, 2], [79, 1], [81, 1], [83, 2], [79, 2],
+               [84, 2], [83, 1], [81, 1], [76, 4], [77, 2], [81, 2], [84, 2], [81, 2],
+               [79, 2], [76, 1], [79, 1], [84, 2], [88, 2], [86, 2], [83, 2], [79, 4],
+               [81, 2], [84, 1], [81, 1], [77, 2], [81, 2], [79, 4], [74, 2], [-1, 2]];
+    var melAt = {};   // 何番目の8分でどの音が鳴るか
+    (function () { var pos = 0; MEL.forEach(function (m) { if (m[0] > 0) melAt[pos] = m; pos += m[1]; }); })();
+    // 宇宙: 同じ和音を、ゆっくり広く
+    var mus = { mode: null, want: null, next: 0, step: 0, timer: null };
+    function playStep(t) {
+      var st = mus.step % 64, bar = (st / 8) | 0, e = st % 8, ch = PROG[bar], mode = mus.mode;
+      if (mode === 'space') {
+        if (e === 0) {
+          ch.forEach(function (n) { tone(musicBus, t, hz(n - 12), E8 * 8, { type: 'sawtooth', vol: .06, att: .6 }); });
+          tone(musicBus, t, hz(ROOT[bar] - 12), E8 * 8, { type: 'sine', vol: .22, att: .3 });
+        }
+        if (e % 2 === 0) tone(musicBus, t, hz(ch[(e / 2) % 4] + 12), E8 * 2, { type: 'sine', vol: .1, echo: true });
+        var sm = melAt[st];
+        if (sm && bar % 2 === 0) tone(musicBus, t, hz(sm[0]), E8 * sm[1] * 1.6, { type: 'sine', vol: .13, echo: true, att: .05 });
+        return;
+      }
+      // タイトルと空: アルペジオ・メロディ(空はベースと太鼓も)
+      var tv = mode === 'title' ? 1.6 : 1;   // タイトルは太鼓もベースも無いぶん、ほかを大きく
+      tone(musicBus, t, hz(ch[e % 4]), E8 * .9, { type: 'triangle', vol: .12 * tv });
+      var m = melAt[st];
+      if (m) tone(musicBus, t, hz(m[0]), E8 * m[1] * .92, { type: 'square', vol: .09 * tv, att: .01 });
+      if (mode === 'sky') {
+        if (e % 2 === 0) tone(musicBus, t, hz(ROOT[bar]), E8 * 1.8, { type: 'triangle', vol: .16 });
+        if (e === 0 || e === 4) tone(musicBus, t, 150, .14, { type: 'sine', to: 45, vol: .14 });
+        if (e === 2 || e === 6) noise(musicBus, t, .12, { type: 'bandpass', f: 1800, vol: .12 });
+        noise(musicBus, t, .03, { type: 'highpass', f: 7000, vol: .035 });
+      }
+    }
+    function tick() {
+      if (!live()) return;
+      if (mus.next < ac.currentTime) mus.next = ac.currentTime + .05;
+      while (mus.next < ac.currentTime + .15) {
+        // 場面の切り替えは小節の頭で(途中でぶつっと変えない)
+        if (mus.step % 8 === 0 && mus.want !== mus.mode) mus.mode = mus.want;
+        if (!mus.mode) { stopTimer(); return; }
+        playStep(mus.next);
+        mus.next += E8; mus.step++;
+      }
+    }
+    function stopTimer() { if (mus.timer) { clearInterval(mus.timer); mus.timer = null; } }
+    // 流す曲を決める。null で止める。
+    // now: 場面が変わったとき(タイトル → ゲームなど)は、すぐ頭から切り替える。
+    // 高さで変わるとき(空 → 宇宙)は now を付けず、小節の頭で切り替える(途中でぶつっと変えない)
+    function music(mode, now) {
+      if (!init()) return;
+      mus.want = mode;
+      if (!mode) { mus.mode = null; stopTimer(); return; }
+      if (now || !mus.mode) {
+        if (mus.mode !== mode || now) { mus.mode = mode; mus.step = 0; mus.next = 0; }
+      }
+      if (!mus.timer) mus.timer = setInterval(tick, 25);
+    }
+    // 一時停止・アプリの切り替え中は、音をまるごと止める
+    function hold(on) {
+      held = on;
+      if (!ac) return;
+      if (on) ac.suspend(); else ac.resume();
+    }
+    function set(kind, on) {
+      pref[kind] = on;
+      try { localStorage.setItem('skyJumpSound', JSON.stringify(pref)); } catch (e) {}
+      if (ac) {
+        musicBus.gain.value = pref.music ? MUSIC_VOL : 0;
+        sfxBus.gain.value = pref.sfx ? SFX_VOL : 0;
+      }
+    }
+    return { unlock: unlock, sfx: sfx, music: music, hold: hold, set: set, pref: pref,
+             state: function () { return { ac: ac ? ac.state : 'none', mode: mus.mode, step: mus.step }; } };
+  })();
+
   // ===== 進行 =====
   function start() {
     // 使う品は開始時に1つ減らしてチェックを外す(「もう一度」で勝手に減らない)。救出ばねは助かった時だけ減る
@@ -2345,6 +2572,8 @@
     recentSpine = []; recentBonus = []; afterMile = false;
     fillUpTo(-H * .6);
     pl = newPlayer();
+    Snd.unlock(); Snd.hold(false); Snd.music('sky', true);
+    if (rocketOn) Snd.sfx('boost');
     vStart.classList.remove('on');
     vOver.classList.remove('on');
     paused = false;
@@ -2363,12 +2592,14 @@
     plats.push(mk(pl.x + pl.w / 2 - 50, y, TRAMPO, 100));
     pl.y = y - pl.h; pl.vy = BF; pl.kx = 0; pl.sq = .9; pl.landT = 9;
     invuln = 90;
+    Snd.sfx('rescue');
     burst(pl.x + pl.w / 2, y, '#ff8fbd', 16);
     toastQ.unshift('🌀 救出ばね！'); toastT = 0;
   }
 
   function over() {
     run = false;
+    Snd.music(null); Snd.sfx('over');
     bPause.classList.remove('show');
     saveBest();
     var got = runCoins();
@@ -2388,12 +2619,14 @@
     run = false; paused = true;
     if (raf) cancelAnimationFrame(raf);
     touchX = null; keys = {};
+    Snd.hold(true);
     vPause.classList.add('on');
   }
   function resume() {
     if (!paused) return;
     paused = false;
     vPause.classList.remove('on');
+    Snd.hold(false);
     run = true;
     kick();
   }
@@ -2408,10 +2641,22 @@
     vStart.classList.add('on');
     buildPicker();
     title();
+    Snd.hold(false); Snd.music('title', true);
   }
 
   // ===== 操作 =====
-  document.addEventListener('visibilitychange', function () { if (document.hidden) pause(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { pause(); Snd.hold(true); }
+    else if (!paused) Snd.hold(false);
+  });
+  // 音: iOS は指で触った瞬間にしか鳴らし始められない。最初のタップで起こし、タイトルなら曲を流す。
+  // ボタンを押したら小さな音(始める・もう一度は、始まりの音があるので鳴らさない)
+  document.addEventListener('click', function (e) {
+    Snd.unlock();
+    if (!run && !paused && !vOver.classList.contains('on')) Snd.music('title');
+    var b = e.target.closest && e.target.closest('button');
+    if (b && b.id !== 'bStart' && b.id !== 'bRetry') Snd.sfx('click');
+  });
   window.addEventListener('pagehide', pause);
   document.addEventListener('keydown', function (e) {
     keys[e.code] = true;
@@ -2450,12 +2695,20 @@
   $('bRetry').addEventListener('click', start);
   $('bChange').addEventListener('click', function () {
     vOver.classList.remove('on');
+    Snd.music('title', true);
     buildPicker();
     title();
     vChars.classList.add('on');
   });
   $('bChars').addEventListener('click', function () { vStart.classList.remove('on'); vChars.classList.add('on'); });
   $('bCharsOk').addEventListener('click', function () { vChars.classList.remove('on'); vStart.classList.add('on'); });
+  function renderSoundUI() {
+    $('bMusic').textContent = '🎵 音楽: ' + (Snd.pref.music ? 'オン' : 'オフ');
+    $('bSfx').textContent = '🔊 効果音: ' + (Snd.pref.sfx ? 'オン' : 'オフ');
+  }
+  renderSoundUI();
+  $('bMusic').addEventListener('click', function () { Snd.set('music', !Snd.pref.music); renderSoundUI(); });
+  $('bSfx').addEventListener('click', function () { Snd.set('sfx', !Snd.pref.sfx); renderSoundUI(); });
   $('bMenu').addEventListener('click', function () { renderTitleUI(); vStart.classList.remove('on'); vMenu.classList.add('on'); });
   $('bMenuClose').addEventListener('click', function () { vMenu.classList.remove('on'); vStart.classList.add('on'); });
   bPause.addEventListener('click', pause);
