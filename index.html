@@ -816,7 +816,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-10-02a';
+  var VERSION = '版 2026-10-02b';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -1510,6 +1510,7 @@
     glass: [338,597,328,134,1, 0.77],
     glass2: [670,597,293,131,1, 0.75],
     crumble: [4,735,274,192,7, 0.77],
+    crumbleSp: [4,735,274,192,7, 0.77],   // 宇宙の崩れる岩(crumble を灰色の岩に塗り替えて使う。rockArt)
     cloud: [282,735,307,159,12, 0.8],
     holo: [593,735,283,114,9, 0.85],
     space: [4,931,312,124,3, 0.75]
@@ -1533,11 +1534,32 @@
       case BOOST: return 'boost';
       case CONVEYOR: return p.dir > 0 ? 'convR' : 'convL';
       case GLASS: return p.crack ? 'glass2' : 'glass';
-      case CRUMBLE: return 'crumble';
+      case CRUMBLE: return p.y < goalY ? 'crumbleSp' : 'crumble';
       case CLOUD: return 'cloud';
       case HOLO: return 'holo';
     }
     return null;
+  }
+  // 宇宙の崩れる足場: 草の生えた土の島は宇宙に合わないので、同じ絵を月の岩のような灰色に塗り替える。
+  // 明るさ(陰影)はそのまま残し、色だけを 暗い青紫 → 明るい灰 の幅に置き直す。草は少し明るい砂にする
+  var rockArt = null;
+  function makeRockArt() {
+    var a = PLAT_ART.crumbleSp, c = document.createElement('canvas');
+    c.width = a[2]; c.height = a[3];
+    var g = c.getContext('2d');
+    g.drawImage(platImg, a[0], a[1], a[2], a[3], 0, 0, a[2], a[3]);
+    try {
+      var d = g.getImageData(0, 0, a[2], a[3]), px = d.data;
+      var lo = [26, 24, 44], hi = [196, 190, 214];
+      for (var i = 0; i < px.length; i += 4) {
+        if (!px[i + 3]) continue;
+        var L = (px[i] * .3 + px[i + 1] * .59 + px[i + 2] * .11) / 255;
+        var t = px[i + 1] - Math.max(px[i], px[i + 2]) > 8 ? Math.min(1, .3 + L * .6) : Math.pow(L, 1.05);
+        px[i] = lo[0] + (hi[0] - lo[0]) * t; px[i + 1] = lo[1] + (hi[1] - lo[1]) * t; px[i + 2] = lo[2] + (hi[2] - lo[2]) * t;
+      }
+      g.putImageData(d, 0, 0);
+    } catch (e) { return null; }   // 画素を読めない環境(file:// など)では、もとの島のまま描く
+    return c;
   }
   // 足場を絵で描く。描けたら true(絵が読めていない・絵の無い種類は false で、図形で描く)
   function drawPlatArt(p, x, y) {
@@ -1557,7 +1579,9 @@
     ctx.save();
     if (alpha < 1) ctx.globalAlpha = alpha;
     var ox = x + p.w / 2 - dw / 2, oy = y + dy - a[4] * ky;
-    ctx.drawImage(platImg, a[0], a[1], a[2], a[3], ox, oy, dw, dh);
+    if (name === 'crumbleSp' && rockArt === null) rockArt = makeRockArt() || false;
+    if (name === 'crumbleSp' && rockArt) ctx.drawImage(rockArt, 0, 0, a[2], a[3], ox, oy, dw, dh);
+    else ctx.drawImage(platImg, a[0], a[1], a[2], a[3], ox, oy, dw, dh);
     var B = CONV_BELT[name];
     if (B) {
       var P = B[5], bh = B[3] - B[2];
@@ -2241,7 +2265,7 @@
           else if (p.type === GLASS) { Snd.sfx('crack'); p.crack = true; pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, '#cfe6f7', 4); }
           else if (p.type === CLOUD) { Snd.sfx('cloud'); p.dip = 1; pl.vy = JMP * .6; pl.sq = .8; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffffff', 6); }
           else if (p.type === CONVEYOR) { Snd.sfx('conveyor'); pl.vy = JMP; pl.kx = p.dir * 4.2; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffc861', 4); }
-          else if (p.type === CRUMBLE) { Snd.sfx('crumble'); if (p.fallT === 0) p.fallT = 1; pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, '#c8a87a', 5); }
+          else if (p.type === CRUMBLE) { Snd.sfx('crumble'); if (p.fallT === 0) p.fallT = 1; pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, p.y < goalY ? '#a9a6bc' : '#c8a87a', 5); }
           else if (p.type === STATION || p.type === MILE) {
             pl.vy = JMP;
             if (!p.got) {
