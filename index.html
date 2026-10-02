@@ -816,7 +816,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-09-26a';
+  var VERSION = '版 2026-10-02a';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -1075,6 +1075,11 @@
     var r = Math.random();
     if (m < 300) return r < .35 ? CRUMBLE : GLASS;
     if (m < 900) { if (r < .34) return CLOUD; if (r < .6) return GLASS; return CRUMBLE; }
+    if (m >= GOAL_M) {   // 宇宙に雲は無い
+      if (r < .4) return HOLO;
+      if (r < .7) return GLASS;
+      return CRUMBLE;
+    }
     if (r < .3) return HOLO;
     if (r < .52) return GLASS;
     if (r < .76) return CRUMBLE;
