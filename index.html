@@ -366,8 +366,11 @@
 
   var BEAM = 0, GONDOLA = 1, TRAMPO = 2, BOOST = 3,
       GLASS = 4, CLOUD = 5, HOLO = 6, STATION = 7,
-      CONVEYOR = 8, CRUMBLE = 9, MILE = 10, UPDRAFT = 11;
+      CONVEYOR = 8, CRUMBLE = 9, MILE = 10, UPDRAFT = 11, ELEVATOR = 12;
   var UPDRAFT_H = 170;      // 上昇気流の柱の高さ(下端が p.y)
+  // エレベーター: もとの位置(by)から上下に ±LIFT_AMP 往復する道すじの足場。
+  // 動いたぶんだけ、前後の足場との間隔が広がっても届くよう、間隔の上限から振れ幅を引いて作る
+  var LIFT_AMP = 20, LIFT_AMP_LOW = 36;
 
   var SKY = [
     // 背景の絵の色に合わせる(絵が読めないとき・絵を薄くしたあとに見える)。2000m から先は暗い宇宙へ
@@ -387,8 +390,8 @@
       jump: 11.2, speed: 4.6, grav: 1.0, wind: 1.0,
       t: 'ぴょーん！と高く跳ぶのが得意！誰よりも高く、空を目指そう！' },
     { key: 'kumo', n: 'わたぐも', tag: 'ふわふわ浮く',
-      jump: 9.4, speed: 4.9, grav: .78, wind: 1.25,
-      t: 'ふわふわと空中に浮かぶのが得意！ゆっくり降りて、のんびり登ろう。' },
+      jump: 9.4, speed: 4.9, grav: .78, wind: 1.25, light: true,
+      t: 'ふわふわと空中に浮かぶのが得意！軽いので、雲の足場でも普通に跳べて、ガラスの足場も割れない。' },
     { key: 'ninja', n: 'たまご忍者', tag: 'バランス型',
       jump: 9.8, speed: 5.6, grav: 1.0, wind: .6,
       t: 'どんな足場でもバランスをとるのが得意！安定して、着実に登ろう。' },
@@ -816,7 +819,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-10-02b';
+  var VERSION = '版 2026-10-04a';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -1052,8 +1055,9 @@
     return { x: x, y: y, w: Math.max(44, w), h: PH, type: type,
              dead: false, crack: false, dip: 0,
              ph: rnd(0, 6.28), dir: Math.random() < .5 ? 1 : -1, sp: rnd(.9, 2.3),
-             fallT: 0, fv: 0 };
+             fallT: 0, fv: 0, by: y, py: y, amp: 0, lw: rnd(.022, .034) };
   }
+  function liftY(p) { return p.by + Math.sin(frame * p.lw + p.ph) * p.amp; }
 
   function spineType(m) {
     if (ticketActive && m >= 90) {
@@ -1063,6 +1067,7 @@
     }
     var r = Math.random();
     if (m < 90) return BEAM;
+    if (m >= 200 && Math.random() < .1) return ELEVATOR;
     if (m < 450) { if (r < .13) return GONDOLA; if (r < .23) return TRAMPO; if (r < .31) return CONVEYOR; return BEAM; }
     if (m < 1100) { if (r < .20) return GONDOLA; if (r < .31) return TRAMPO; if (r < .35) return BOOST; if (r < .45) return CONVEYOR; return BEAM; }
     if (r < .26) return GONDOLA;
@@ -1104,7 +1109,7 @@
   // 横幅 w の足場を、ほかの足場と横に重ならない位置に置く。絵は判定より左右に幅の2割ほどはみ出すので、
   // そのぶんと隙間 8pt を空ける。何度か試して見つからなければ null。fixedX を渡すと、その位置で重ならないかだけ見る。
   // 左右に動く足場が近くにあるときは、どこに置いてもいつか重なるので null
-  var recentSpine = [], recentBonus = [], afterMile = false;   // 近くの道すじと、近くのおまけ
+  var recentSpine = [], recentBonus = [], afterMile = false, liftAmp = 0;   // liftAmp: 直前の道すじがエレベーターなら、その振れ幅   // 近くの道すじと、近くのおまけ
   function freeX(w, others, fixedX) {
     for (var tries = 0; tries < (fixedX === undefined ? 12 : 1); tries++) {
       var x = fixedX === undefined ? rnd(0, W - w) : fixedX, ok = true;
@@ -1122,23 +1127,39 @@
     var base = W * PW;
     while (genY > topY) {
       // 区切りのブロックは、直前の足場から届く間隔に置く
-      if (genY - mileY <= (genY < goalY ? SAFE_GAP_LOW : SAFE_GAP)) {
+      var low = genY < goalY, LIM = low ? SAFE_GAP_LOW : SAFE_GAP;
+      if (genY - mileY <= LIM - liftAmp) {
         var st = mk(0, mileY, mileIdx === 0 ? STATION : MILE, W);
         st.h = 18; st.mi = mileIdx; plats.push(st);
         afterMile = true;   // 区切りのすぐ上には、おまけを置かない(絵が区切りの上面に触れる)
+        liftAmp = 0;
         genY = mileY;
         mileIdx++; mileY = mToY(mileAt(mileIdx));
         continue;
       }
       var g = gap(yToM(genY), genY);
+      // 直前がエレベーターなら、下がったときに届かず、上がったときにぶつからないよう間隔を詰める
+      if (liftAmp) g = Math.max(Math.min(g, LIM - liftAmp), liftAmp + 40);
       var ny = genY - g;
       if (ny < mileY + 80) ny = mileY + 80;
 
       var m = yToM(ny), L = zoneLv(m), thin = 1 - .07 * L;
       var t = spineType(m);
+      var amp = low ? LIFT_AMP_LOW : LIFT_AMP;
+      // エレベーターは、動いても届く間隔(上限 - 振れ幅)まで詰めて置く。間隔はふだん上限に張りついているので、
+      // 詰めずに「上限を超えるなら出さない」にすると、ほとんど出なかった。詰めても近すぎるとき・続くときは出さない
+      if (t === ELEVATOR) {
+        var gl = Math.min(genY - ny, LIM - amp);
+        // 区切りが近いときは、すぐ区切りを置ける(届く)か、そのあいだに次の足場が入る(区切りの 80pt 下 + 近すぎない間隔)ときだけ
+        var dm = genY - gl - mileY;
+        if (liftAmp || gl < amp + 40 || !(dm <= LIM - amp || dm >= amp + 120)) t = BEAM;
+        else { ny = genY - gl; g = gl; }
+      }
       var w = base * wmul(m, t) * thin;
       var sp = mk(rnd(0, W - w), ny, t, w);
       sp.sp *= 1 + .15 * L;
+      if (t === ELEVATOR) { sp.amp = amp; sp.y = liftY(sp); }
+      liftAmp = t === ELEVATOR ? amp : 0;
       plats.push(sp);
       // 道すじは届く間隔の保証があるので動かさない。先に置いたおまけと重なったら、おまけの方を取り除く
       for (var bi = recentBonus.length - 1; bi >= 0; bi--) {
@@ -1262,6 +1283,20 @@
     ctx.fillStyle = 'rgba(255,255,255,.6)'; rr(x + 10, y - 1, w - 20, 1.6, .8); ctx.fill();
     ctx.restore();
   }
+  // エレベーターの通り道: 足場の真ん中の縦の光の筋と、上下の端の三角。明るい空でも暗い宇宙でも見えるよう、暗い縁取りの上に明るい筋を重ねる
+  function drawLiftRail(p) {
+    var cx = p.x + p.w / 2, top = p.by - p.amp - camY - 4, bot = p.by + p.amp - camY + PH + 4;
+    ctx.save();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(20,40,100,.4)'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(cx, top); ctx.lineTo(cx, bot); ctx.stroke();
+    ctx.strokeStyle = 'rgba(200,248,255,.95)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(cx, top); ctx.lineTo(cx, bot); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = 'rgba(20,40,100,.5)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(cx, top - 8); ctx.lineTo(cx - 6, top + 1); ctx.lineTo(cx + 6, top + 1); ctx.closePath(); ctx.stroke(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx, bot + 8); ctx.lineTo(cx - 6, bot - 1); ctx.lineTo(cx + 6, bot - 1); ctx.closePath(); ctx.stroke(); ctx.fill();
+    ctx.restore();
+  }
   function drawPlat(p) {
     var y = p.y - camY;
     if (p.type === UPDRAFT) { if (!p.dead && y > -10 && y - UPDRAFT_H < H) drawUpdraft(p, y); return; }
@@ -1271,6 +1306,7 @@
     if (p.type === GLASS && p.crack) { x += rnd(-1.5, 1.5); y += rnd(-1, 1); }
 
     if (p.type === MILE) { drawMile(p, y); return; }
+    if (p.type === ELEVATOR) drawLiftRail(p);
     if (drawPlatArt(p, x, y)) return;
 
     // 宇宙ステーション（ゴール足場）
@@ -1529,6 +1565,7 @@
     switch (p.type) {
       case BEAM: return p.y < goalY ? 'space' : 'beam';
       case GONDOLA: return 'gondola';
+      case ELEVATOR: return p.y < goalY ? 'space' : 'beam';
       // ばね: ふだんは縮んだ絵(背が低い)、乗った瞬間だけ伸びた絵にして、はずむ動きに見せる
       case TRAMPO: return p.hitT > 0 ? 'trampo' : 'trampo2';
       case BOOST: return 'boost';
@@ -2250,7 +2287,8 @@
         if (p.type === UPDRAFT) continue;
         if (p.type === CRUMBLE && p.fallT > 18) continue;
         var foot = pl.y + pl.h, prev = foot - pl.vy;
-        if (pl.x + pl.w > p.x && pl.x < p.x + p.w && foot >= p.y && prev <= p.y) {
+        // 上下に動く足場は、前のコマの高さ(py)と今の高さのあいだを足がまたいだかで見る(動く足場がすれちがうと、すり抜けた)
+        if (pl.x + pl.w > p.x && pl.x < p.x + p.w && foot >= p.y && prev <= (p.py > p.y ? p.py : p.y)) {
           if (p.type === GLASS && p.crack) {
             p.dead = true;
             Snd.sfx('shatter');
@@ -2262,8 +2300,12 @@
           pl.landT = 9;
           if (p.type === TRAMPO) { Snd.sfx('spring'); pl.vy = TF; pl.sq = .85; p.hitT = 10; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ff8fbd', 7); }
           else if (p.type === BOOST) { Snd.sfx('boost'); pl.vy = BF; pl.sq = .9; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffe08a', 14); }
-          else if (p.type === GLASS) { Snd.sfx('crack'); p.crack = true; pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, '#cfe6f7', 4); }
-          else if (p.type === CLOUD) { Snd.sfx('cloud'); p.dip = 1; pl.vy = JMP * .6; pl.sq = .8; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffffff', 6); }
+          else if (p.type === GLASS) {
+            // 軽い子は、乗ってもひびが入らない
+            if (CH.light) Snd.sfx('jump'); else { Snd.sfx('crack'); p.crack = true; }
+            pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, '#cfe6f7', 4);
+          }
+          else if (p.type === CLOUD) { Snd.sfx('cloud'); p.dip = 1; pl.vy = CH.light ? JMP : JMP * .6; pl.sq = .8; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffffff', 6); }
           else if (p.type === CONVEYOR) { Snd.sfx('conveyor'); pl.vy = JMP; pl.kx = p.dir * 4.2; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffc861', 4); }
           else if (p.type === CRUMBLE) { Snd.sfx('crumble'); if (p.fallT === 0) p.fallT = 1; pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, p.y < goalY ? '#a9a6bc' : '#c8a87a', 5); }
           else if (p.type === STATION || p.type === MILE) {
@@ -2283,7 +2325,10 @@
       var q = plats[j];
       if (q.dead) continue;
       if (q.hitT > 0) q.hitT--;   // ばねが縮んだ絵を出す残り
-      if (q.type === GONDOLA) {
+      q.py = q.y;
+      if (q.type === ELEVATOR) {
+        q.y = liftY(q);
+      } else if (q.type === GONDOLA) {
         q.x += q.dir * q.sp;
         if (q.x < 0 || q.x + q.w > W) q.dir *= -1;
       } else if (q.type === CLOUD && q.dip > 0) {
