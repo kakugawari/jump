@@ -351,6 +351,8 @@
   'use strict';
 
   // ===== 調整値 =====
+  // ムササビの術(glide): 落ちているあいだ、落ちる速さを GLIDE_VY までに抑える
+  var GLIDE_VY = 3.2;
   var G = 0.35;            // ふわっと長め
   var LOWG = 0.18;         // 宇宙の低重力
   var JUMP = -9.5;         // 到達高 ≒ 129px（低重力なら約251px）
@@ -387,14 +389,14 @@
   // 性能は「ジャンプ 8.9 以上」を守る（それ未満だと届かない足場が出る）
   var CHARS = [
     { key: 'usagi', n: 'バネうさぎ', tag: 'ジャンプ特化',
-      jump: 11.2, speed: 4.6, grav: 1.0, wind: 1.0,
-      t: 'ぴょーん！と高く跳ぶのが得意！誰よりも高く、空を目指そう！' },
+      jump: 11.2, speed: 4.6, grav: 1.0, wind: 1.0, boost: 1.1,
+      t: 'ぴょーん！と高く跳ぶのが得意！ばね床とロケット床も、よく効く。誰よりも高く、空を目指そう！' },
     { key: 'kumo', n: 'わたぐも', tag: 'ふわふわ浮く',
       jump: 9.4, speed: 4.9, grav: .78, wind: 1.25, light: true,
       t: 'ふわふわと空中に浮かぶのが得意！軽いので、雲の足場でも普通に跳べて、ガラスの足場も割れない。' },
-    { key: 'ninja', n: 'たまご忍者', tag: 'バランス型',
-      jump: 9.8, speed: 5.6, grav: 1.0, wind: .6,
-      t: 'どんな足場でもバランスをとるのが得意！安定して、着実に登ろう。' },
+    { key: 'ninja', n: 'たまご忍者', tag: 'ムササビの術',
+      jump: 9.8, speed: 5.6, grav: 1.0, wind: .6, glide: true,
+      t: 'ムササビの術で、落ちるときはゆっくり滑空！横の動きが速く、風にも強い。' },
     { key: 'king', n: 'スターキング', tag: '全部乗せ最強', unlockM: 10000, coin: 1.5, tough: true,
       jump: 11.2, speed: 6.2, grav: .82, wind: .45,
       t: 'ジャンプも浮遊も報酬も全部そろった王さま！コインが1.5倍。' }
@@ -502,8 +504,8 @@
     CH = CHARS[sel];
     JMP = -CH.jump;
     var k = CH.jump / 9.5;
-    TF = TRAMPO_F * k;
-    BF = BOOST_F * k;
+    TF = TRAMPO_F * k * (CH.boost || 1);   // boost: ばね床・ロケット床の効きの倍率
+    BF = BOOST_F * k * (CH.boost || 1);
   }
 
   // 解放済みの印(owned)は記録とは別に持つ。記録を消しても閉じない
@@ -819,7 +821,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-10-04a';
+  var VERSION = '版 2026-10-05a';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -1940,6 +1942,24 @@
     return { x: W / 2 - 15, y: groundY - 26, w: 30, h: 26, vy: JMP, kx: 0, sq: 0, landT: 0 };
   }
 
+  // ムササビの布: 体の両わきから斜め下へ広がる。広げるとき(a: 0〜1)に大きくなり、ゆっくりはためく
+  function drawGlideCloth(cx, cy, a, P) {
+    var fl = Math.sin(frame * .2), w = (48 + 3 * fl) * a, d = (24 + 2 * fl) * a;
+    ctx.save();
+    ctx.lineJoin = 'round'; ctx.lineWidth = 2.5;
+    for (var sgn = -1; sgn <= 1; sgn += 2) {
+      ctx.beginPath();
+      ctx.moveTo(cx + sgn * 10, cy - 4 * a);                                                  // 肩
+      ctx.quadraticCurveTo(cx + sgn * w * .6, cy - 8 * a - fl * a, cx + sgn * w, cy + 4 * a);  // 手の先まで
+      ctx.quadraticCurveTo(cx + sgn * w * .55, cy + d * .5, cx + sgn * 14, cy + d);             // 足もとへ戻る
+      ctx.closePath();
+      var gr = ctx.createLinearGradient(cx, cy, cx + sgn * w, cy + d * .4);
+      gr.addColorStop(0, P.dark); gr.addColorStop(1, P.band);
+      ctx.fillStyle = gr; ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.stroke();
+    }
+    ctx.restore();
+  }
   function drawPlayer() {
     var v = Math.max(-1, Math.min(1, pl.vy / 13));
     var stretch = pl.vy < 0 ? -v * .22 : v * .10;
@@ -1955,6 +1975,7 @@
     ctx.fillStyle = 'rgba(0,0,0,.2)';
     ell(ctx, cx, by + 2, rx * .85, 3); ctx.fill();
     var S = spriteFor(CH.key, skinOf(CH.key)), cy;
+    if (CH.glide && pl.gl > .05) drawGlideCloth(cx, by - CHAR_H * .42, pl.gl, skinOf(CH.key));
     if (S) {
       var k = CHAR_H / (S.box[0].y1 - S.box[0].y0);
       cy = drawSprite(ctx, S, st, cx, by + 1, k, 1 + (rx / R - 1) * .5, 1 + (ry / R - 1) * .5, pl.face || 1);
@@ -2250,6 +2271,12 @@
     if (pl.x > W) pl.x = -pl.w;
 
     pl.vy += (pl.y < goalY ? LOWG : G) * CH.grav;
+    if (CH.glide) {
+      // ムササビ: 落ちはじめたら布を広げ(pl.gl: 0〜1)、落ちる速さを抑える。急に止めず、1コマ .6 ずつ減らす(ぶつかられて落とされたときも、すぐ戻る)
+      var gliding = pl.vy > 1 && !rocketOn;
+      pl.gl = (pl.gl || 0) + ((gliding ? 1 : 0) - (pl.gl || 0)) * .25;
+      if (gliding && pl.vy > GLIDE_VY) pl.vy = Math.max(GLIDE_VY, pl.vy - .6);
+    }
     var inUd = null;
     for (var u = 0; u < plats.length; u++) {
       var ud = plats[u];
