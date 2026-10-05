@@ -392,8 +392,8 @@
       jump: 11.2, speed: 4.6, grav: 1.0, wind: 1.0, boost: 1.1,
       t: 'ぴょーん！と高く跳ぶのが得意！ばね床とロケット床も、よく効く。誰よりも高く、空を目指そう！' },
     { key: 'kumo', n: 'わたぐも', tag: 'ふわふわ浮く',
-      jump: 9.4, speed: 4.9, grav: .78, wind: 1.25, light: true,
-      t: 'ふわふわと空中に浮かぶのが得意！軽いので、雲の足場でも普通に跳べて、ガラスの足場も割れない。' },
+      jump: 9.4, speed: 4.9, grav: .78, wind: 1.25, light: true, ghost: true,
+      t: 'ふわふわと浮かぶのが得意！軽くて雲もガラスも平気、ドローンも隕石もすり抜ける。' },
     { key: 'ninja', n: 'たまご忍者', tag: 'ムササビの術',
       jump: 9.8, speed: 5.6, grav: 1.0, wind: .6, glide: true,
       t: 'ムササビの術で、落ちるときはゆっくり滑空！横の動きが速く、風にも強い。' },
@@ -821,7 +821,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-10-06a';
+  var VERSION = '版 2026-10-07a';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -1985,6 +1985,7 @@
 
     ctx.save();
     if (invuln > 0 && (invuln >> 2) % 2 === 0) ctx.globalAlpha = .45;
+    else if (pl.ghostT > 0) ctx.globalAlpha = .5;   // すり抜けている間は薄くなる
     ctx.fillStyle = 'rgba(0,0,0,.2)';
     ell(ctx, cx, by + 2, rx * .85, 3); ctx.fill();
     if (CH.glide && !S && pl.gl > .05) drawGlideCloth(cx, by - CHAR_H * .42, pl.gl, skinOf(CH.key));   // 絵が無い(色違いの)ときだけ、図形の布
@@ -2069,6 +2070,13 @@
     pl.kx = dx * 3.6;
     burst(pl.x + pl.w / 2, pl.y + pl.h / 2, '#dbe6f2', 8);
   }
+  // 敵に当たった: すり抜ける子(ghost)は、薄くなるだけで落とされない。ふつうの子は、はじかれる
+  function hitFoe(dx) {
+    if (!CH.ghost) { knock(dx); return; }
+    if (rocketOn) return;
+    if (!(pl.ghostT > 0)) { Snd.sfx('cloud'); burst(pl.x + pl.w / 2, pl.y + pl.h / 2, '#ffffff', 6); }
+    pl.ghostT = 16;
+  }
   function countFoe(k) {
     var n = 0;
     for (var i = 0; i < foes.length; i++) if (foes[i].k === k) n++;
@@ -2106,8 +2114,8 @@
       if (f.k === 'drone') {
         f.x += f.vx; f.bob += .2;
         var my = f.y + Math.sin(f.bob) * 10;
-        if (invuln <= 0 && pl.x + pl.w > f.x - 15 && pl.x < f.x + 15 &&
-            pl.y + pl.h > my - 10 && pl.y < my + 10) knock(f.dir);
+        if ((CH.ghost || invuln <= 0) && pl.x + pl.w > f.x - 15 && pl.x < f.x + 15 &&
+            pl.y + pl.h > my - 10 && pl.y < my + 10) hitFoe(f.dir);
         if (f.x > W + 60 || f.x < -60) foes.splice(i, 1);
       } else {
         f.x += f.vx; f.y += f.vy; f.rot += f.rv;
@@ -2116,7 +2124,7 @@
                        life: .5, c: Math.random() < .5 ? '#ff9a3d' : '#ffe08a', r: rnd(1, 3) });
         }
         var dx = f.x - (pl.x + pl.w / 2), dy = f.y - (pl.y + pl.h / 2);
-        if (invuln <= 0 && dx * dx + dy * dy < 24 * 24) knock(f.vx >= 0 ? 1 : -1);
+        if ((CH.ghost || invuln <= 0) && dx * dx + dy * dy < 24 * 24) hitFoe(f.vx >= 0 ? 1 : -1);
         if (f.y > camY + H + 70) foes.splice(i, 1);
       }
     }
@@ -2312,6 +2320,7 @@
     pl.sq *= .85;
     if (pl.vy < -17) burst(pl.x + pl.w / 2, pl.y + pl.h, '#ff9a3d', 1);
     if (pl.landT > 0) pl.landT--;
+    if (pl.ghostT > 0) pl.ghostT--;
     if (equip.trail !== 'none') { if (frame % 2 === 0) trailPart(equip.trail); }
     else if (CH.key === 'king' && frame % 3 === 0) {
       parts.push({ x: pl.x + pl.w / 2 + rnd(-8, 8), y: pl.y + pl.h * .5,
