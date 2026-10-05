@@ -821,7 +821,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-10-07a';
+  var VERSION = '版 2026-10-07b';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -1551,14 +1551,17 @@
     crumbleSp: [4,735,274,192,7, 0.77],   // 宇宙の崩れる岩(crumble を灰色の岩に塗り替えて使う。rockArt)
     cloud: [282,735,307,159,12, 0.8],
     holo: [593,735,283,114,9, 0.85],
-    space: [4,931,312,124,3, 0.75]
+    space: [4,931,312,124,3, 0.75],
+    lift: [0,0,372,298,22, 0.93]   // 昇降台(別の絵 plat-lift-v1.webp)。上の円盤の真ん中の線に足を乗せる
   };
   var PLAT_TOP_FILL = .9;   // 絵の上面が当たり判定の幅の何割になるか(判定を少し広めにして、ふちで落ちないように)
   var PLAT_MAX_DOWN = 44;   // 上面より下に垂れる部分の高さの上限(足場どうしの上下の間隔は狭い所で約64pt)
   // ばねは台より土台が広く背も高いので、台を判定より小さめにし、下に垂れるのも少し許す
-  var PLAT_FILL = { trampo: .72, trampo2: .72 }, PLAT_DOWN = { trampo: 64, trampo2: 50 };
+  var PLAT_FILL = { trampo: .72, trampo2: .72 }, PLAT_DOWN = { trampo: 64, trampo2: 50, lift: 60 };
   var platImg = new Image();
   platImg.src = 'plats-v1.webp';
+  var liftImg = new Image();
+  liftImg.src = 'plat-lift-v1.webp';
   // コンベアの帯: [左, 右, 上, 下, くり返す区間の左, 矢印の間隔](絵の中の画素)。
   // 帯の中だけ切り抜き、矢印1つぶんの区間を並べて向きへ流す
   var CONV_BELT = { convR: [62, 290, 16, 42, 78, 44.25], convL: [32, 285, 19, 47, 38, 50.75] };
@@ -1567,7 +1570,7 @@
     switch (p.type) {
       case BEAM: return p.y < goalY ? 'space' : 'beam';
       case GONDOLA: return 'gondola';
-      case ELEVATOR: return p.y < goalY ? 'space' : 'beam';
+      case ELEVATOR: return 'lift';
       // ばね: ふだんは縮んだ絵(背が低い)、乗った瞬間だけ伸びた絵にして、はずむ動きに見せる
       case TRAMPO: return p.hitT > 0 ? 'trampo' : 'trampo2';
       case BOOST: return 'boost';
@@ -1603,7 +1606,8 @@
   // 足場を絵で描く。描けたら true(絵が読めていない・絵の無い種類は false で、図形で描く)
   function drawPlatArt(p, x, y) {
     var name = platArtName(p);
-    if (!name || !platImg.naturalWidth) return false;
+    var im = name === 'lift' ? liftImg : platImg;
+    if (!name || !im.naturalWidth) return false;
     var a = PLAT_ART[name];
     var k = p.w * (PLAT_FILL[name] || PLAT_TOP_FILL) / a[5] / a[2];                       // 横の縮尺
     var ky = Math.min(k, (PLAT_DOWN[name] || PLAT_MAX_DOWN) / Math.max(1, a[3] - a[4])); // 縦は、下に垂れすぎないよう縮めることがある
@@ -1620,7 +1624,7 @@
     var ox = x + p.w / 2 - dw / 2, oy = y + dy - a[4] * ky;
     if (name === 'crumbleSp' && rockArt === null) rockArt = makeRockArt() || false;
     if (name === 'crumbleSp' && rockArt) ctx.drawImage(rockArt, 0, 0, a[2], a[3], ox, oy, dw, dh);
-    else ctx.drawImage(platImg, a[0], a[1], a[2], a[3], ox, oy, dw, dh);
+    else ctx.drawImage(im, a[0], a[1], a[2], a[3], ox, oy, dw, dh);
     var B = CONV_BELT[name];
     if (B) {
       var P = B[5], bh = B[3] - B[2];
