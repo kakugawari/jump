@@ -821,7 +821,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-10-05b';
+  var VERSION = '版 2026-10-06a';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -1884,19 +1884,26 @@
   var POSE = { normal: 0, jump: 1, land: 2, glide: 3 };
   var CHAR_H = 54;          // ゲーム中の「通常」ポーズの高さ(pt)
   var SPR = {};
-  // 絵を差し替えたら名前も変える(絵はキャッシュ優先で配るので、同じ名前だと古い絵が出続ける)
-  var SPRITE_FILE = { usagi: 'char-usagi.webp', kumo: 'char-kumo.webp', ninja: 'char-ninja-v3.webp', king: 'char-king.webp' };
-  // 絵のポーズの数(ふつうは 通常・ジャンプ・着地 の 3 つ。忍者は滑空を足した 4 つ)と、
-  // 足もとの行(セルの上から何画素目か)。足もとより下に効果(跳ぶときの筋)がある絵は、いちばん下の画素ではなく、この行を足もとにそろえる
-  var SPRITE_POSES = { ninja: 4 };
-  var SPRITE_FOOT = { ninja: 265 };
+  // 絵の一覧。名前は 'キャラ' か 'キャラ:色違いの番号'。絵を差し替えたら、ファイル名も変える(絵はキャッシュ優先で配るので、同じ名前だと古い絵が出続ける)
+  // poses: ポーズの数(ふつうは 通常・ジャンプ・着地 の 3 つ。忍者は滑空を足した 4 つ)
+  // foot: 足もとの行(セルの上から何画素目か)。足もとより下に効果(跳ぶときの筋・着地のしぶき)がある絵は、いちばん下の画素ではなく、この行を足もとにそろえる
+  var SPRITES = {
+    'usagi': { file: 'char-usagi.webp' },
+    'usagi:1': { file: 'char-usagi-pink.webp', foot: 253 },
+    'usagi:2': { file: 'char-usagi-lavender.webp', foot: 253 },
+    'kumo': { file: 'char-kumo.webp' },
+    'kumo:1': { file: 'char-kumo-sunset.webp', foot: 210 },
+    'kumo:2': { file: 'char-kumo-storm.webp', foot: 266 },
+    'ninja': { file: 'char-ninja-v3.webp', poses: 4, foot: 265 },
+    'king': { file: 'char-king.webp' }
+  };
   function loadSprites() {
-    var left = CHARS.length;
-    CHARS.forEach(function (c) {
-      var img = new Image();
+    var ids = Object.keys(SPRITES), left = ids.length;
+    ids.forEach(function (id) {
+      var def = SPRITES[id], img = new Image();
       img.onload = function () {
         // ポーズごとに絵のある範囲を測っておく(大きさを決めるのと、ヘルメットの中心に使う)
-        var np = SPRITE_POSES[c.key] || 3, cw = img.naturalWidth / np, ch = img.naturalHeight;
+        var np = def.poses || 3, cw = img.naturalWidth / np, ch = img.naturalHeight;
         var t = document.createElement('canvas'); t.width = img.naturalWidth; t.height = ch;
         var tg = t.getContext('2d'); tg.drawImage(img, 0, 0);
         var d = tg.getImageData(0, 0, t.width, ch).data, box = [];
@@ -1908,19 +1915,19 @@
               if (lx < x0) x0 = lx; if (lx > x1) x1 = lx; if (y < y0) y0 = y; if (y > y1) y1 = y;
             }
           }
-          box.push({ x0: x0, x1: x1, y0: y0, y1: SPRITE_FOOT[c.key] || y1 });
+          box.push({ x0: x0, x1: x1, y0: y0, y1: def.foot || y1 });
         }
-        SPR[c.key] = { img: img, cw: cw, ch: ch, box: box };
+        SPR[id] = { img: img, cw: cw, ch: ch, box: box };
         if (--left === 0 && !run) buildPicker();
       };
       img.onerror = function () { --left; };
-      img.src = SPRITE_FILE[c.key];
+      img.src = def.file;
     });
   }
-  // 絵で描けるか(読み込めていて、もとの色のとき)
+  // 絵で描けるか(その色の絵が読み込めているとき。絵の無い色は図形で描く)
   function spriteFor(key, P) {
-    var S = SPR[key];
-    return S && P === SKINS[key][0] ? S : null;
+    var k = SKINS[key].indexOf(P);
+    return k < 0 ? null : (SPR[k ? key + ':' + k : key] || null);
   }
   // 足もと(cx, by)を基準に、ポーズの絵を描く。k は縮尺(絵の画素 → pt)、sx/sy は伸び縮み、face は向き
   function drawSprite(g, S, st, cx, by, k, sx, sy, face) {
