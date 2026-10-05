@@ -1,4 +1,4 @@
-const CACHE = 'sky-hopper-v11';
+const CACHE = 'sky-hopper-v12';
 const ASSETS = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'title-v2.jpg', 'char-usagi.webp', 'char-kumo.webp', 'char-ninja-v3.webp', 'char-king.webp', 'stage-bg.jpg', 'plats-v1.webp', 'facilities-v1.webp', 'space-bg.jpg', 'space2-bg.jpg'];
 
 self.addEventListener('install', e => {
