@@ -372,7 +372,7 @@
   var UPDRAFT_H = 170;      // 上昇気流の柱の高さ(下端が p.y)
   // エレベーター: もとの位置(by)から上下に ±LIFT_AMP 往復する道すじの足場。
   // 動いたぶんだけ、前後の足場との間隔が広がっても届くよう、間隔の上限から振れ幅を引いて作る
-  var LIFT_AMP = 20, LIFT_AMP_LOW = 36;
+  var LIFT_AMP = 40, LIFT_AMP_LOW = 100;
 
   var SKY = [
     // 背景の絵の色に合わせる(絵が読めないとき・絵を薄くしたあとに見える)。2000m から先は暗い宇宙へ
@@ -821,7 +821,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-10-07b';
+  var VERSION = '版 2026-10-08a';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -1111,7 +1111,8 @@
   // 横幅 w の足場を、ほかの足場と横に重ならない位置に置く。絵は判定より左右に幅の2割ほどはみ出すので、
   // そのぶんと隙間 8pt を空ける。何度か試して見つからなければ null。fixedX を渡すと、その位置で重ならないかだけ見る。
   // 左右に動く足場が近くにあるときは、どこに置いてもいつか重なるので null
-  var recentSpine = [], recentBonus = [], afterMile = false, liftAmp = 0;   // liftAmp: 直前の道すじがエレベーターなら、その振れ幅   // 近くの道すじと、近くのおまけ
+  var recentSpine = [], recentBonus = [], afterMile = false;   // 近くの道すじと、近くのおまけ
+  var liftAmp = 0, liftPrev = null, lastSpine = null, lastLift = null;   // 直前の道すじがエレベーターなら、その振れ幅と足場。直前の道すじ(区切りも)
   function freeX(w, others, fixedX) {
     for (var tries = 0; tries < (fixedX === undefined ? 12 : 1); tries++) {
       var x = fixedX === undefined ? rnd(0, W - w) : fixedX, ok = true;
@@ -1134,34 +1135,51 @@
         var st = mk(0, mileY, mileIdx === 0 ? STATION : MILE, W);
         st.h = 18; st.mi = mileIdx; plats.push(st);
         afterMile = true;   // 区切りのすぐ上には、おまけを置かない(絵が区切りの上面に触れる)
-        liftAmp = 0;
+        liftAmp = 0; liftPrev = null; lastSpine = st;
         genY = mileY;
         mileIdx++; mileY = mToY(mileAt(mileIdx));
         continue;
       }
       var g = gap(yToM(genY), genY);
       // 直前がエレベーターなら、下がったときに届かず、上がったときにぶつからないよう間隔を詰める
-      if (liftAmp) g = Math.max(Math.min(g, LIM - liftAmp), liftAmp + 40);
+      if (liftAmp) g = Math.max(Math.min(g, LIM - liftAmp), 40);
       var ny = genY - g;
       if (ny < mileY + 80) ny = mileY + 80;
 
       var m = yToM(ny), L = zoneLv(m), thin = 1 - .07 * L;
       var t = spineType(m);
       var amp = low ? LIFT_AMP_LOW : LIFT_AMP;
+      if (liftPrev && t === GONDOLA) t = BEAM;   // 左右に動く足場は、エレベーターの上下の動きと重なる
+      var w, sx;
       // エレベーターは、動いても届く間隔(上限 - 振れ幅)まで詰めて置く。間隔はふだん上限に張りついているので、
-      // 詰めずに「上限を超えるなら出さない」にすると、ほとんど出なかった。詰めても近すぎるとき・続くときは出さない
+      // 詰めずに「上限を超えるなら出さない」にすると、ほとんど出なかった。
+      // 動く範囲(上下 ±amp)が、となりの足場と重ならないよう、横の位置をずらす(区切りなど、横いっぱいの足場と、
+      // 左右に動く足場のとなりには置けない)。区切りが近いときは、すぐ区切りを置ける(届く)か、そのあいだに次の足場が入るときだけ
       if (t === ELEVATOR) {
         var gl = Math.min(genY - ny, LIM - amp);
-        // 区切りが近いときは、すぐ区切りを置ける(届く)か、そのあいだに次の足場が入る(区切りの 80pt 下 + 近すぎない間隔)ときだけ
         var dm = genY - gl - mileY;
-        if (liftAmp || gl < amp + 40 || !(dm <= LIM - amp || dm >= amp + 120)) t = BEAM;
+        var okMile = dm >= amp + 120 || (dm >= amp + 60 && dm <= LIM - amp);
+        var okPrev = lastSpine && lastSpine.w < W - 1 && lastSpine.type !== GONDOLA;
+        w = Math.max(44, base * wmul(m, t) * thin);   // mk() は 44pt 未満を広げるので、広げたあとの幅で位置を決める
+        // 1 つおいて前のエレベーターとも、動く範囲が重なるなら、横にずらす
+        var near = [lastSpine];
+        if (lastLift && !lastLift.dead && lastLift.by - (genY - gl) < lastLift.amp + amp + 30) near.push(lastLift);
+        sx = okPrev ? freeX(w, near) : null;
+        if (liftPrev || gl < 40 || !okMile || sx === null) t = BEAM;
         else { ny = genY - gl; g = gl; }
       }
-      var w = base * wmul(m, t) * thin;
-      var sp = mk(rnd(0, W - w), ny, t, w);
+      if (t !== ELEVATOR) {
+        w = Math.max(44, base * wmul(m, t) * thin);   // mk() は 44pt 未満を広げるので、広げたあとの幅で位置を決める
+        sx = rnd(0, W - w);
+        if (liftPrev) {   // 直前がエレベーターなら、その動く範囲と横に重ならない所へ。置けなければ、エレベーターは動かさない
+          var nx = freeX(w, [liftPrev]);
+          if (nx === null) { liftPrev.amp = 0; liftPrev.y = liftPrev.by; } else sx = nx;
+        }
+      }
+      var sp = mk(sx, ny, t, w);
       sp.sp *= 1 + .15 * L;
-      if (t === ELEVATOR) { sp.amp = amp; sp.y = liftY(sp); }
-      liftAmp = t === ELEVATOR ? amp : 0;
+      if (t === ELEVATOR) { sp.amp = amp; sp.lw = low ? rnd(.014, .022) : rnd(.02, .03); sp.y = liftY(sp); lastLift = sp; }
+      liftAmp = t === ELEVATOR ? amp : 0; liftPrev = t === ELEVATOR ? sp : null; lastSpine = sp;
       plats.push(sp);
       // 道すじは届く間隔の保証があるので動かさない。先に置いたおまけと重なったら、おまけの方を取り除く
       for (var bi = recentBonus.length - 1; bi >= 0; bi--) {
@@ -1283,6 +1301,24 @@
     ctx.globalAlpha = 1;
     ctx.fillStyle = '#5fcfc0'; rr(x + 6, y - 2, w - 12, 6, 3); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,.6)'; rr(x + 10, y - 1, w - 20, 1.6, .8); ctx.fill();
+    ctx.restore();
+  }
+  // 昇降台の上下の矢印: ライトのように光らせる。▲と▼が、かわりばんこに強く光る(絵の中の三角の頂点)
+  var LIFT_LIGHTS = [[[245, 76], [221, 127], [269, 127]], [[278, 70], [322, 70], [300, 118]]];
+  function drawLiftLights(ox, oy, k, ky, ph) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (var i = 0; i < 2; i++) {
+      var T = LIFT_LIGHTS[i], a = .3 + .7 * (.5 + .5 * Math.sin(frame * .1 + ph + i * Math.PI));
+      var cx = ox + (T[0][0] + T[1][0] + T[2][0]) / 3 * k, cy = oy + (T[0][1] + T[1][1] + T[2][1]) / 3 * ky, r = 48 * k;
+      // 三角の形に、明るい色を重ねる(四角く重ねると、まわりの暗い金属まで明るくなった)
+      ctx.globalAlpha = a * .7; ctx.fillStyle = '#9ff6ff';
+      ctx.beginPath(); ctx.moveTo(ox + T[0][0] * k, oy + T[0][1] * ky); ctx.lineTo(ox + T[1][0] * k, oy + T[1][1] * ky); ctx.lineTo(ox + T[2][0] * k, oy + T[2][1] * ky); ctx.closePath(); ctx.fill();
+      // まわりに光がにじむ
+      var g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, 'rgba(120,240,255,' + .6 * a + ')'); g.addColorStop(.4, 'rgba(70,205,255,' + .25 * a + ')'); g.addColorStop(1, 'rgba(70,205,255,0)');
+      ctx.globalAlpha = 1; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 6.2832); ctx.fill();
+    }
     ctx.restore();
   }
   // エレベーターの通り道: 足場の真ん中の縦の光の筋と、上下の端の三角。明るい空でも暗い宇宙でも見えるよう、暗い縁取りの上に明るい筋を重ねる
@@ -1625,6 +1661,7 @@
     if (name === 'crumbleSp' && rockArt === null) rockArt = makeRockArt() || false;
     if (name === 'crumbleSp' && rockArt) ctx.drawImage(rockArt, 0, 0, a[2], a[3], ox, oy, dw, dh);
     else ctx.drawImage(im, a[0], a[1], a[2], a[3], ox, oy, dw, dh);
+    if (name === 'lift') drawLiftLights(ox, oy, k, ky, p.ph);
     var B = CONV_BELT[name];
     if (B) {
       var P = B[5], bh = B[3] - B[2];
@@ -2695,7 +2732,7 @@
     g.h = 30; g.ground = true;
     plats.push(g);
     genY = groundY;
-    recentSpine = []; recentBonus = []; afterMile = false;
+    recentSpine = []; recentBonus = []; afterMile = false; liftAmp = 0; liftPrev = null; lastSpine = null; lastLift = null;
     fillUpTo(-H * .6);
     pl = newPlayer();
     Snd.unlock(); Snd.hold(false); Snd.music('sky', true);
