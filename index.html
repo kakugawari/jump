@@ -821,7 +821,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-10-05a';
+  var VERSION = '版 2026-10-05b';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -1881,22 +1881,26 @@
   // ===== キャラの絵 =====
   // char-<key>.webp は 3ポーズ(通常・ジャンプ・着地)を同じ大きさのセルに横に並べたもの。
   // どのポーズも同じ縮尺で、セルの下に足をそろえてある。読み込めるまでと、色違いを付けている間は図形で描く
-  var POSE = { normal: 0, jump: 1, land: 2 };
+  var POSE = { normal: 0, jump: 1, land: 2, glide: 3 };
   var CHAR_H = 54;          // ゲーム中の「通常」ポーズの高さ(pt)
   var SPR = {};
   // 絵を差し替えたら名前も変える(絵はキャッシュ優先で配るので、同じ名前だと古い絵が出続ける)
-  var SPRITE_FILE = { usagi: 'char-usagi.webp', kumo: 'char-kumo.webp', ninja: 'char-ninja-v2.webp', king: 'char-king.webp' };
+  var SPRITE_FILE = { usagi: 'char-usagi.webp', kumo: 'char-kumo.webp', ninja: 'char-ninja-v3.webp', king: 'char-king.webp' };
+  // 絵のポーズの数(ふつうは 通常・ジャンプ・着地 の 3 つ。忍者は滑空を足した 4 つ)と、
+  // 足もとの行(セルの上から何画素目か)。足もとより下に効果(跳ぶときの筋)がある絵は、いちばん下の画素ではなく、この行を足もとにそろえる
+  var SPRITE_POSES = { ninja: 4 };
+  var SPRITE_FOOT = { ninja: 265 };
   function loadSprites() {
     var left = CHARS.length;
     CHARS.forEach(function (c) {
       var img = new Image();
       img.onload = function () {
         // ポーズごとに絵のある範囲を測っておく(大きさを決めるのと、ヘルメットの中心に使う)
-        var cw = img.naturalWidth / 3, ch = img.naturalHeight;
+        var np = SPRITE_POSES[c.key] || 3, cw = img.naturalWidth / np, ch = img.naturalHeight;
         var t = document.createElement('canvas'); t.width = img.naturalWidth; t.height = ch;
         var tg = t.getContext('2d'); tg.drawImage(img, 0, 0);
         var d = tg.getImageData(0, 0, t.width, ch).data, box = [];
-        for (var n = 0; n < 3; n++) {
+        for (var n = 0; n < np; n++) {
           var x0 = cw, x1 = 0, y0 = ch, y1 = 0;
           for (var y = 0; y < ch; y++) for (var x = Math.round(n * cw); x < Math.round((n + 1) * cw); x++) {
             if (d[(y * t.width + x) * 4 + 3] > 40) {
@@ -1904,7 +1908,7 @@
               if (lx < x0) x0 = lx; if (lx > x1) x1 = lx; if (y < y0) y0 = y; if (y > y1) y1 = y;
             }
           }
-          box.push({ x0: x0, x1: x1, y0: y0, y1: y1 });
+          box.push({ x0: x0, x1: x1, y0: y0, y1: SPRITE_FOOT[c.key] || y1 });
         }
         SPR[c.key] = { img: img, cw: cw, ch: ch, box: box };
         if (--left === 0 && !run) buildPicker();
@@ -1969,13 +1973,14 @@
     var ry = R * (1 - pl.sq * .26 + stretch) - wob;
     var cx = pl.x + pl.w / 2, by = pl.y - camY + pl.h;
     var st = pl.landT > 0 ? 'land' : (pl.vy < -3 ? 'jump' : 'normal');
+    var S = spriteFor(CH.key, skinOf(CH.key)), cy;
+    if (CH.glide && S && pl.landT <= 0 && pl.gl > .5) st = 'glide';
 
     ctx.save();
     if (invuln > 0 && (invuln >> 2) % 2 === 0) ctx.globalAlpha = .45;
     ctx.fillStyle = 'rgba(0,0,0,.2)';
     ell(ctx, cx, by + 2, rx * .85, 3); ctx.fill();
-    var S = spriteFor(CH.key, skinOf(CH.key)), cy;
-    if (CH.glide && pl.gl > .05) drawGlideCloth(cx, by - CHAR_H * .42, pl.gl, skinOf(CH.key));
+    if (CH.glide && !S && pl.gl > .05) drawGlideCloth(cx, by - CHAR_H * .42, pl.gl, skinOf(CH.key));   // 絵が無い(色違いの)ときだけ、図形の布
     if (S) {
       var k = CHAR_H / (S.box[0].y1 - S.box[0].y0);
       cy = drawSprite(ctx, S, st, cx, by + 1, k, 1 + (rx / R - 1) * .5, 1 + (ry / R - 1) * .5, pl.face || 1);
