@@ -914,7 +914,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-10-09b';
+  var VERSION = '版 2026-10-10a';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -2309,7 +2309,7 @@
       var f = foes[i];
       if (f.k === 'bolt') {
         if (f.st === 'warn') {
-          if (--f.t <= 0) { f.st = 'go'; f.t = 12; f.pts = boltPts(f.x); flashScreen(true); Snd.sfx('thunder'); }
+          if (--f.t <= 0) { f.st = 'go'; f.t = 12; f.pts = boltPts(f.x); flashScreen(true); Snd.sfx('thunder'); Snd.duck(.3); }
         } else {
           if ((CH.ghost || invuln <= 0) && pl.x + pl.w > f.x - 13 && pl.x < f.x + 13) hitFoe(pl.x + pl.w / 2 < f.x ? -1 : 1);
           if (--f.t <= 0) foes.splice(i, 1);
@@ -2621,7 +2621,7 @@
   }
 
   function paint() {
-    if (run) Snd.music(hm < BG_TOP_M ? 'sky' : 'space');
+    if (run) Snd.music(hm >= BG_TOP_M ? 'space' : stage === 'storm' ? 'storm' : 'sky');
     ctx.clearRect(0, 0, W, H);
     drawSky();
     drawBg();
@@ -2805,7 +2805,8 @@
     }
 
     // ----- 音楽 -----
-    var BPM = 112, E8 = 60 / BPM / 2;   // 8分音符の長さ(秒)
+    var BPM = 112, BPM_STORM = 132;
+    function e8() { return 60 / (mus.mode === 'storm' ? BPM_STORM : BPM) / 2; }   // 8分音符の長さ(秒)。曲ごとに速さがちがう
     // 8小節。和音(アルペジオ用)、ベースの根音、メロディ [音, 8分いくつぶん](-1 は休み)
     var PROG = [[60, 64, 67, 72], [59, 62, 67, 71], [57, 60, 64, 69], [57, 60, 65, 69],
                 [60, 64, 67, 72], [59, 62, 67, 71], [57, 60, 65, 69], [59, 62, 67, 71]];
@@ -2814,12 +2815,56 @@
                [84, 2], [83, 1], [81, 1], [76, 4], [77, 2], [81, 2], [84, 2], [81, 2],
                [79, 2], [76, 1], [79, 1], [84, 2], [88, 2], [86, 2], [83, 2], [79, 4],
                [81, 2], [84, 1], [81, 1], [77, 2], [81, 2], [79, 4], [74, 2], [-1, 2]];
-    var melAt = {};   // 何番目の8分でどの音が鳴るか
-    (function () { var pos = 0; MEL.forEach(function (m) { if (m[0] > 0) melAt[pos] = m; pos += m[1]; }); })();
+    // 雷雲の海: 同じ8小節の長さで、イ短調(Am-F-Dm-E)。メロディは半音のゆらぎ(E-D#、C-B、G#-A)で不安にする
+    var PROG_S = [[57, 60, 64, 69], [53, 57, 60, 65], [50, 53, 57, 62], [52, 56, 59, 64],
+                  [57, 60, 64, 69], [53, 57, 60, 65], [50, 53, 57, 62], [52, 56, 59, 64]];
+    var ROOT_S = [45, 41, 38, 40, 45, 41, 38, 40];
+    var MEL_S = [[76, 3], [75, 1], [76, 2], [72, 2], [72, 3], [71, 1], [72, 2], [69, 2],
+                 [74, 2], [77, 2], [76, 2], [74, 2], [68, 2], [71, 2], [76, 4],
+                 [81, 3], [80, 1], [81, 2], [76, 2], [77, 3], [76, 1], [77, 2], [72, 2],
+                 [74, 2], [69, 2], [74, 2], [77, 2], [76, 2], [75, 2], [76, 2], [-1, 2]];
+    function melMap(mel) { var map = {}, pos = 0; mel.forEach(function (m) { if (m[0] > 0) map[pos] = m; pos += m[1]; }); return map; }
+    var melAt = melMap(MEL), melAtS = melMap(MEL_S);   // 何番目の8分でどの音が鳴るか
     // 宇宙: 同じ和音を、ゆっくり広く
     var mus = { mode: null, want: null, next: 0, step: 0, timer: null };
+    // 低いごろごろ(雷鳴): 小節の頭からふくらんで、ゆっくり消える。1 秒のざらざらを繰り返して長くする
+    function rumble(dest, t, dur, vol) {
+      var src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+      var fl = ac.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 300; fl.Q.value = .8;
+      var g = ac.createGain();
+      g.gain.setValueAtTime(.0001, t); g.gain.linearRampToValueAtTime(vol, t + dur * .4); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+      src.connect(fl); fl.connect(g); g.connect(dest);
+      src.start(t, Math.random() * .5); src.stop(t + dur + .03);
+    }
+    function playStorm(t, st, bar, e) {
+      var E8 = e8(), ch = PROG_S[bar];
+      // 和音: 低い厚みを小節ごとに長くのばす + ごろごろ
+      if (e === 0) {
+        ch.forEach(function (n) { tone(musicBus, t, hz(n - 12), E8 * 8, { type: 'sawtooth', vol: .04, att: .8 }); });
+        rumble(musicBus, t, E8 * 8, .16);
+      }
+      // 弱いアルペジオ(ひとつおき)と、ベースの脈
+      if (e % 2 === 0) {
+        tone(musicBus, t, hz(ch[(e / 2) % 4]), E8 * 1.6, { type: 'triangle', vol: .07, echo: true });
+        tone(musicBus, t, hz(ROOT_S[bar]), E8 * 1.7, { type: 'triangle', vol: .17 });
+      }
+      // 太鼓: 「どん・どどん」と、床を叩くような低いタム。雨のざあざあは小さな高い雑音
+      if (e === 0) tone(musicBus, t, 140, .22, { type: 'sine', to: 40, vol: .26 });
+      if (e === 3) tone(musicBus, t, 140, .18, { type: 'sine', to: 40, vol: .15 });
+      if (e === 4) { tone(musicBus, t, 100, .26, { type: 'sine', to: 52, vol: .2 }); noise(musicBus, t, .14, { type: 'lowpass', f: 600, to: 200, vol: .16 }); }
+      if (e === 7) tone(musicBus, t, 110, .16, { type: 'sine', to: 60, vol: .09 });
+      noise(musicBus, t, .04, { type: 'highpass', f: 6500, vol: .03 });
+      // メロディ: 少しずらした2本のノコギリ波(うなりが出て不気味)に、やまびこ
+      var m = melAtS[st];
+      if (m) {
+        var d = E8 * m[1] * .95;
+        tone(musicBus, t, hz(m[0]) * 1.005, d, { type: 'sawtooth', vol: .045, att: .02, echo: true });
+        tone(musicBus, t, hz(m[0]) / 1.005, d, { type: 'sawtooth', vol: .045, att: .02, echo: true });
+      }
+    }
     function playStep(t) {
-      var st = mus.step % 64, bar = (st / 8) | 0, e = st % 8, ch = PROG[bar], mode = mus.mode;
+      var st = mus.step % 64, bar = (st / 8) | 0, e = st % 8, ch = PROG[bar], mode = mus.mode, E8 = e8();
+      if (mode === 'storm') { playStorm(t, st, bar, e); return; }
       if (mode === 'space') {
         if (e === 0) {
           ch.forEach(function (n) { tone(musicBus, t, hz(n - 12), E8 * 8, { type: 'sawtooth', vol: .06, att: .6 }); });
@@ -2850,7 +2895,7 @@
         if (mus.step % 8 === 0 && mus.want !== mus.mode) mus.mode = mus.want;
         if (!mus.mode) { stopTimer(); return; }
         playStep(mus.next);
-        mus.next += E8; mus.step++;
+        mus.next += e8(); mus.step++;
       }
     }
     function stopTimer() { if (mus.timer) { clearInterval(mus.timer); mus.timer = null; } }
@@ -2872,15 +2917,24 @@
       if (!ac) return;
       if (on) ac.suspend(); else ac.resume();
     }
+    // 雷が落ちたとき、曲を一瞬へこませる(約 20% まで落として、すぐ戻す)。効果音の雷を聞かせるため
+    function duck(hold) {
+      if (!live() || !pref.music) return;
+      var t = ac.currentTime, g = musicBus.gain;
+      g.cancelScheduledValues(t);
+      g.setTargetAtTime(MUSIC_VOL * .2, t, .015);
+      g.setTargetAtTime(MUSIC_VOL, t + (hold || .35), .3);
+    }
     function set(kind, on) {
       pref[kind] = on;
       try { localStorage.setItem('skyJumpSound', JSON.stringify(pref)); } catch (e) {}
       if (ac) {
+        musicBus.gain.cancelScheduledValues(ac.currentTime);   // へこませている途中の戻しが、切ったあとに音を戻さないように
         musicBus.gain.value = pref.music ? MUSIC_VOL : 0;
         sfxBus.gain.value = pref.sfx ? SFX_VOL : 0;
       }
     }
-    return { unlock: unlock, sfx: sfx, music: music, hold: hold, set: set, pref: pref,
+    return { unlock: unlock, sfx: sfx, music: music, duck: duck, hold: hold, set: set, pref: pref,
              state: function () { return { ac: ac ? ac.state : 'none', mode: mus.mode, step: mus.step }; } };
   })();
 
@@ -2913,7 +2967,7 @@
     recentSpine = []; recentBonus = []; afterMile = false; liftAmp = 0; liftPrev = null; lastSpine = null; lastLift = null;
     fillUpTo(-H * .6);
     pl = newPlayer();
-    Snd.unlock(); Snd.hold(false); Snd.music('sky', true);
+    Snd.unlock(); Snd.hold(false); Snd.music(stage === 'storm' ? 'storm' : 'sky', true);
     if (rocketOn) Snd.sfx('boost');
     vStart.classList.remove('on');
     vOver.classList.remove('on');
