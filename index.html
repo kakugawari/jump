@@ -411,7 +411,7 @@
   // ステージ: 最高が 20000m に届くと、2つ目が選べる。ステージごとに、背景の絵・空の色・天気がちがう
   var STAGES = [
     { id: 'sky', n: '青空', bg: 'stage-bg.jpg' },
-    { id: 'storm', n: '雷雲の海', bg: 'storm-bg.jpg' }
+    { id: 'storm', n: '雷雲の海', bg: 'storm-bg-v2.jpg' }
   ];
   var STAGE_OPEN_M = 20000;   // ここに届くと、雷雲の海が開く
   var STORM_TOP = 2300;       // 嵐の天気(雨・風・稲妻)があるのは、ここまで。この上は宇宙
@@ -914,7 +914,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-10-09a';
+  var VERSION = '版 2026-10-09b';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
