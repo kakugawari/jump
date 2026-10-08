@@ -1,5 +1,5 @@
-const CACHE = 'sky-hopper-v18';
-const ASSETS = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'title-v2.jpg', 'char-usagi.webp', 'char-kumo.webp', 'char-kumo-sunset.webp', 'char-kumo-storm.webp', 'char-usagi-pink.webp', 'char-usagi-lavender.webp', 'char-ninja-v3.webp', 'char-king.webp', 'stage-bg.jpg', 'plats-v1.webp', 'plat-lift-v1.webp', 'plats-ice-v1.webp', 'ice-bg-v2.jpg', 'storm-bg-v2.jpg', 'facilities-v1.webp', 'space-bg.jpg', 'space2-bg.jpg'];
+const CACHE = 'sky-hopper-v19';
+const ASSETS = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'title-v2.jpg', 'char-usagi.webp', 'char-kumo.webp', 'char-kumo-sunset.webp', 'char-kumo-storm.webp', 'char-usagi-pink.webp', 'char-usagi-lavender.webp', 'char-ninja-v3.webp', 'char-king.webp', 'char-king-silver.webp', 'char-king-ruby.webp', 'stage-bg.jpg', 'plats-v1.webp', 'plat-lift-v1.webp', 'plats-ice-v1.webp', 'ice-bg-v2.jpg', 'storm-bg-v2.jpg', 'facilities-v1.webp', 'space-bg.jpg', 'space2-bg.jpg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
