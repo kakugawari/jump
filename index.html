@@ -413,7 +413,7 @@
   // 順番に開く: 青空で 20000m に届くと氷の世界、氷の世界で 20000m に届くと雷雲の海
   var STAGES = [
     { id: 'sky', n: '青空', bg: 'stage-bg.jpg', icon: '☀' },
-    { id: 'ice', n: '氷の世界', bg: 'ice-bg.jpg', icon: '❄' },
+    { id: 'ice', n: '氷の世界', bg: 'ice-bg-v2.jpg', icon: '❄' },
     { id: 'storm', n: '雷雲の海', bg: 'storm-bg-v2.jpg', icon: '⚡' }
   ];
   var STAGE_OPEN_M = 20000;   // いまのステージで、ここに届くと、次のステージが開く
@@ -933,7 +933,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-10-11b';
+  var VERSION = '版 2026-10-12a';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -1193,7 +1193,10 @@
   function bonusType(m) {
     var r = Math.random();
     // 氷の世界(宇宙の手前まで): ほとんどがガラス(氷)の足場。ときどき点滅する足場
-    if (stage === 'ice' && m < GOAL_M) return m >= 900 && r < .3 ? HOLO : GLASS;
+    if (stage === 'ice' && m < GOAL_M) {
+      if (m >= 300) { if (r < .05) return CLOUD; if (r < .10) return CRUMBLE; }   // 雪の雲・雪の島(崩れる)を、少しだけ
+      return m >= 900 && Math.random() < .12 ? HOLO : GLASS;
+    }
     if (m < 300) return r < .35 ? CRUMBLE : GLASS;
     if (m < 900) { if (r < .34) return CLOUD; if (r < .6) return GLASS; return CRUMBLE; }
     if (m >= GOAL_M) {   // 宇宙に雲は無い
@@ -1285,8 +1288,13 @@
       if (t !== ELEVATOR) {
         w = Math.max(44, base * wmul(m, t) * thin);   // mk() は 44pt 未満を広げるので、広げたあとの幅で位置を決める
         sx = rnd(0, W - w);
+        // 氷の世界(宇宙の手前まで)は、道すじを近くのガラスなどと重ならない所へ置く。重なると、あとから ガラスの方が取り除かれ、
+        // せっかく置いたガラスがほとんど残らなかった(おまけの 7 割が消えていた)
+        var iceB = stage === 'ice' && m < GOAL_M ? recentBonus.filter(function (o) { return o.y - ny < 140; }) : [];
+        if (iceB.length) { var bx0 = freeX(w, iceB); if (bx0 !== null) sx = bx0; }
         if (liftPrev) {   // 直前がエレベーターなら、その動く範囲と横に重ならない所へ。置けなければ、エレベーターは動かさない
-          var nx = freeX(w, [liftPrev]);
+          var nx = freeX(w, [liftPrev].concat(iceB));
+          if (nx === null) nx = freeX(w, [liftPrev]);
           if (nx === null) { liftPrev.amp = 0; liftPrev.y = liftPrev.by; } else sx = nx;
         }
       }
@@ -1308,16 +1316,21 @@
       // おまけの足場は、上下の道すじの足場と横に重ならない所にだけ置く(置けなければ置かない)。
       // 雲が道すじの真上に重なると、降りてきたところで雲に乗って低くしか跳べず、次へ届かなくなった
       // 置く確率は、重なって取りやめるぶんを見込んで少し高めにし、おまけの数を前(重なりを許していた頃)とそろえた
-      if (!afterMile && g > 54 && Math.random() < (m < 300 ? .5 : 1)) {
-        var bt = m >= 300 && Math.random() < .2 ? UPDRAFT : bonusType(m);
+      // 氷の世界(宇宙の手前まで)は、ガラスを増やす: 序盤から必ず置き、間隔にゆとりがあれば 1 つの間に 2 枚置く
+      var iceLow = stage === 'ice' && m < GOAL_M, nb = iceLow && g > 72 ? 2 : 1, placed = [];
+      for (var bn = 0; bn < nb; bn++) {
+        if (afterMile || g <= 54 || Math.random() >= (m < 300 && !iceLow ? .5 : 1)) continue;
+        var bt = m >= 300 && Math.random() < (iceLow ? .08 : .2) ? UPDRAFT : bonusType(m);
         // 幅は mk() と同じく 44pt 未満にはしない(細いまま位置を決めると、広げたぶん重なった)
         var bw = Math.max(44, bt === UPDRAFT ? 56 : base * wmul(m, bt) * .88 * thin);
-        var bx = freeX(bw, recentSpine.concat([sp]));
+        var bx = freeX(bw, recentSpine.concat([sp], placed));
         if (bx !== null) {
-          var bp = mk(bx, ny + g * (.35 + Math.random() * .3), bt, bw);
+          // 2 枚目は、1 枚目と上下にもずらす(間隔の上半分と下半分)
+          var fr = nb === 2 ? (bn === 0 ? .3 + Math.random() * .12 : .58 + Math.random() * .12) : .35 + Math.random() * .3;
+          var bp = mk(bx, ny + g * fr, bt, bw);
           bp.bonus = true;
           plats.push(bp);
-          recentBonus.push(bp);
+          recentBonus.push(bp); placed.push(bp);
         }
       }
       recentSpine.push(sp);
@@ -1704,6 +1717,21 @@
     space: [4,931,312,124,3, 0.75],
     lift: [0,0,372,298,22, 0.93]   // 昇降台(別の絵 plat-lift-v1.webp)。上の円盤の真ん中の線に足を乗せる
   };
+  // 氷の世界(2000m まで)は、雪の足場の絵 plats-ice-v1.webp を使う。並びは同じ [x, y, 幅, 高さ, 上面の高さ, 上面の幅の割合]
+  var PLAT_ART_ICE = {
+    beam: [4,4,380,121,34,0.86],
+    gondola: [388,4,380,52,23,0.8],
+    trampo: [772,4,195,204,3,0.55],
+    trampo2: [4,212,195,140,2,0.55],
+    boost: [203,212,332,236,125,0.92],
+    convR: [539,212,360,64,4,0.9],
+    convL: [4,452,360,64,4,0.9],
+    glass: [368,452,340,109,2,0.85],
+    glass2: [4,565,340,99,2,0.84],
+    crumble: [348,565,380,68,17,0.84],
+    cloud: [4,668,320,67,10,0.75],
+    holo: [328,668,330,30,3,0.92]
+  };
   var PLAT_TOP_FILL = .9;   // 絵の上面が当たり判定の幅の何割になるか(判定を少し広めにして、ふちで落ちないように)
   var PLAT_MAX_DOWN = 44;   // 上面より下に垂れる部分の高さの上限(足場どうしの上下の間隔は狭い所で約64pt)
   // ばねは台より土台が広く背も高いので、台を判定より小さめにし、下に垂れるのも少し許す
@@ -1712,9 +1740,12 @@
   platImg.src = 'plats-v1.webp';
   var liftImg = new Image();
   liftImg.src = 'plat-lift-v1.webp';
+  var iceImg = new Image();
+  iceImg.src = 'plats-ice-v1.webp';
   // コンベアの帯: [左, 右, 上, 下, くり返す区間の左, 矢印の間隔](絵の中の画素)。
   // 帯の中だけ切り抜き、矢印1つぶんの区間を並べて向きへ流す
   var CONV_BELT = { convR: [62, 290, 16, 42, 78, 44.25], convL: [32, 285, 19, 47, 38, 50.75] };
+  var CONV_BELT_ICE = { convR: [34, 328, 15, 39, 44, 36.57], convL: [32, 326, 15, 39, 39, 36.57] };
   var CONV_SPEED = 1.2;     // 矢印の流れる速さ(pt/コマ)
   function platArtName(p) {
     switch (p.type) {
@@ -1756,9 +1787,11 @@
   // 足場を絵で描く。描けたら true(絵が読めていない・絵の無い種類は false で、図形で描く)
   function drawPlatArt(p, x, y) {
     var name = platArtName(p);
-    var im = name === 'lift' ? liftImg : platImg;
+    // 氷の世界の宇宙より下は雪の足場の絵(昇降台と、絵の無い種類は今まで通り)
+    var ice = stage === 'ice' && p.y >= goalY && !!PLAT_ART_ICE[name];
+    var im = name === 'lift' ? liftImg : ice ? iceImg : platImg;
     if (!name || !im.naturalWidth) return false;
-    var a = PLAT_ART[name];
+    var a = (ice ? PLAT_ART_ICE : PLAT_ART)[name];
     var k = p.w * (PLAT_FILL[name] || PLAT_TOP_FILL) / a[5] / a[2];                       // 横の縮尺
     var ky = Math.min(k, (PLAT_DOWN[name] || PLAT_MAX_DOWN) / Math.max(1, a[3] - a[4])); // 縦は、下に垂れすぎないよう縮めることがある
     var dy = 0, alpha = 1;
@@ -1776,13 +1809,13 @@
     if (name === 'crumbleSp' && rockArt) ctx.drawImage(rockArt, 0, 0, a[2], a[3], ox, oy, dw, dh);
     else ctx.drawImage(im, a[0], a[1], a[2], a[3], ox, oy, dw, dh);
     if (name === 'lift') drawLiftLights(ox, oy, k, ky, p.ph);
-    var B = CONV_BELT[name];
+    var B = (ice ? CONV_BELT_ICE : CONV_BELT)[name];
     if (B) {
       var P = B[5], bh = B[3] - B[2];
       var off = ((frame * CONV_SPEED / k * p.dir) % P + P) % P;
       ctx.beginPath(); ctx.rect(ox + B[0] * k, oy + B[2] * ky, (B[1] - B[0]) * k, bh * ky); ctx.clip();
       for (var sx = B[0] - P + off; sx < B[1]; sx += P) {
-        ctx.drawImage(platImg, a[0] + B[4], a[1] + B[2], P, bh, ox + sx * k, oy + B[2] * ky, P * k + .5, bh * ky);
+        ctx.drawImage(im, a[0] + B[4], a[1] + B[2], P, bh, ox + sx * k, oy + B[2] * ky, P * k + .5, bh * ky);
       }
     }
     ctx.restore();
@@ -2312,6 +2345,7 @@
     ctx.beginPath();
     for (var j = 0; j < snow.length; j++) { var f = snow[j]; ctx.moveTo(f.x + f.r, f.y); ctx.arc(f.x, f.y, f.r, 0, 6.2832); }
     ctx.fill();
+    ctx.strokeStyle = 'rgba(70,120,200,.6)'; ctx.lineWidth = 1; ctx.stroke();   // 白い雲の前でも見えるよう、細い青のふちを付ける
     ctx.restore();
   }
   // 突風の予告: 風が来る側のふちに、向きを示す矢印がならんで点滅する
