@@ -894,7 +894,7 @@
     } catch (e) { stageOpen = {}; stageBest = { sky: best }; }
     // もう届いている人: 20000m に届いたことがあれば氷の世界、氷の世界で届いていれば雷雲の海(いちど開いたものは閉じない)
     var opened = false;
-    if (best >= STAGE_OPEN_M && !stageOpen.ice) { stageOpen.ice = true; opened = true; }
+    if ((best >= STAGE_OPEN_M || stageOpen.storm) && !stageOpen.ice) { stageOpen.ice = true; opened = true; }   // 雷雲の海が開いているなら、手前の氷の世界も開いている
     if ((stageBest.ice || 0) >= STAGE_OPEN_M && !stageOpen.storm) { stageOpen.storm = true; opened = true; }
     if (opened) saveStageOpen();
     STAGES.forEach(function (st) { if (stageOpen[st.id]) { var pre = new Image(); pre.src = st.bg; } });
@@ -933,7 +933,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-10-11a';
+  var VERSION = '版 2026-10-11b';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
