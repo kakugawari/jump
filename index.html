@@ -123,6 +123,7 @@
   .stagebar .sname { min-width: 104px; text-align: center; font-size: 15px; font-weight: 800; letter-spacing: .06em; text-shadow: 0 1px 2px rgba(10,30,100,.6); }
   /* 雷雲の海を選んでいるときは、タイトルの絵を暗くする */
   #vStart.stormsel::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(rgba(14,22,56,.6), rgba(40,52,84,.38)); }
+  #vStart.icesel::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(rgba(200,228,255,.34), rgba(150,200,245,.22)); }
   #flash { position: absolute; inset: 0; background: #e4efff; opacity: 0; pointer-events: none; }
   #bStart { left: 19.4%; top: 78.8%; width: 59.8%; height: 7.4%; }
   #bChars { left: 15.6%; top: 88.2%; width: 32.9%; height: 6%; }
@@ -409,11 +410,24 @@
   ];
 
   // ステージ: 最高が 20000m に届くと、2つ目が選べる。ステージごとに、背景の絵・空の色・天気がちがう
+  // 順番に開く: 青空で 20000m に届くと氷の世界、氷の世界で 20000m に届くと雷雲の海
   var STAGES = [
-    { id: 'sky', n: '青空', bg: 'stage-bg.jpg' },
-    { id: 'storm', n: '雷雲の海', bg: 'storm-bg-v2.jpg' }
+    { id: 'sky', n: '青空', bg: 'stage-bg.jpg', icon: '☀' },
+    { id: 'ice', n: '氷の世界', bg: 'ice-bg.jpg', icon: '❄' },
+    { id: 'storm', n: '雷雲の海', bg: 'storm-bg-v2.jpg', icon: '⚡' }
   ];
-  var STAGE_OPEN_M = 20000;   // ここに届くと、雷雲の海が開く
+  var STAGE_OPEN_M = 20000;   // いまのステージで、ここに届くと、次のステージが開く
+  var ICE_TOP = 2300;         // 氷の天気(雪・突風・つらら)があるのは、ここまで。この上は宇宙
+  var SKY_ICE = [
+    { m: 0,    t: [150, 196, 244], b: [226, 240, 255] },
+    { m: 1500, t: [52, 98, 196],   b: [120, 172, 232] },
+    { m: 2000, t: [31, 59, 144],   b: [37, 62, 160] },
+    { m: 2350, t: [24, 42, 116],   b: [30, 48, 132] },
+    { m: 2800, t: [6, 8, 30],      b: [16, 18, 58] },
+    { m: 5000, t: [10, 4, 32],     b: [34, 14, 70] },
+    { m: 10000, t: [2, 12, 30],    b: [10, 46, 72] },
+    { m: 20000, t: [16, 2, 26],    b: [58, 12, 64] }
+  ];
   var STORM_TOP = 2300;       // 嵐の天気(雨・風・稲妻)があるのは、ここまで。この上は宇宙
   var SKY_STORM = [
     { m: 0,    t: [32, 40, 62],  b: [78, 92, 118] },
@@ -425,7 +439,7 @@
     { m: 10000, t: [2, 12, 30],  b: [10, 46, 72] },
     { m: 20000, t: [16, 2, 26],  b: [58, 12, 64] }
   ];
-  var SKYS = { sky: SKY, storm: SKY_STORM };
+  var SKYS = { sky: SKY, ice: SKY_ICE, storm: SKY_STORM };
 
   // 性能は「ジャンプ 8.9 以上」を守る（それ未満だと届かない足場が出る）
   var CHARS = [
@@ -878,8 +892,12 @@
       var sg = localStorage.getItem('skyJumpStage');
       if (sg && stageOpen[sg]) stage = sg;
     } catch (e) { stageOpen = {}; stageBest = { sky: best }; }
-    if (best >= STAGE_OPEN_M && !stageOpen.storm) { stageOpen.storm = true; saveStageOpen(); }   // もう届いている人
-    if (stageOpen.storm) { var pre = new Image(); pre.src = stageDef('storm').bg; }
+    // もう届いている人: 20000m に届いたことがあれば氷の世界、氷の世界で届いていれば雷雲の海(いちど開いたものは閉じない)
+    var opened = false;
+    if (best >= STAGE_OPEN_M && !stageOpen.ice) { stageOpen.ice = true; opened = true; }
+    if ((stageBest.ice || 0) >= STAGE_OPEN_M && !stageOpen.storm) { stageOpen.storm = true; opened = true; }
+    if (opened) saveStageOpen();
+    STAGES.forEach(function (st) { if (stageOpen[st.id]) { var pre = new Image(); pre.src = st.bg; } });
     renderStage();
   }
   function saveStageOpen() { try { localStorage.setItem('skyJumpStages', JSON.stringify(stageOpen)); } catch (e) {} }
@@ -888,14 +906,15 @@
     if (stageOpen[id]) return;
     stageOpen[id] = true; saveStageOpen();
     var def = stageDef(id);
-    toastQ.push('⚡ 新ステージ「' + def.n + '」が選べるようになった！');
+    toastQ.push(def.icon + ' 新ステージ「' + def.n + '」が選べるようになった！');
     stageNews = '新ステージ「' + def.n + '」が選べるようになった！';
     var pre = new Image(); pre.src = def.bg;
   }
   function renderStage() {
-    $('stageBar').hidden = !stageOpen.storm;
+    $('stageBar').hidden = !(stageOpen.ice || stageOpen.storm);
     $('stageName').textContent = stageDef(stage).n;
     vStart.classList.toggle('stormsel', stage === 'storm');
+    vStart.classList.toggle('icesel', stage === 'ice');
     elBest.textContent = stageBest[stage] || 0;
   }
   function cycleStage(d) {
@@ -914,7 +933,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-10-10b';
+  var VERSION = '版 2026-10-11a';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -1173,6 +1192,8 @@
   }
   function bonusType(m) {
     var r = Math.random();
+    // 氷の世界(宇宙の手前まで): ほとんどがガラス(氷)の足場。ときどき点滅する足場
+    if (stage === 'ice' && m < GOAL_M) return m >= 900 && r < .3 ? HOLO : GLASS;
     if (m < 300) return r < .35 ? CRUMBLE : GLASS;
     if (m < 900) { if (r < .34) return CLOUD; if (r < .6) return GLASS; return CRUMBLE; }
     if (m >= GOAL_M) {   // 宇宙に雲は無い
@@ -2240,8 +2261,11 @@
     for (var y = 28; y < H + 40; y += 38) { cx = Math.max(x - 20, Math.min(x + 20, cx + rnd(-16, 16))); pts.push([cx, y]); }
     return pts;
   }
+  function nextStageOf(id) { for (var i = 0; i < STAGES.length; i++) if (STAGES[i].id === id) return STAGES[i + 1] || null; return null; }
   function stepWeather() {
-    if (!stageOpen.storm && hm >= STAGE_OPEN_M) openStage('storm');
+    var nx = nextStageOf(stage);
+    if (nx && !stageOpen[nx.id] && hm >= STAGE_OPEN_M) openStage(nx.id);
+    stepIce();
     if (!stormOn()) return;
     if (!rain.length) for (var i = 0; i < 70; i++) rain.push({ x: rnd(-40, W + 40), y: rnd(0, H), vy: rnd(15, 22), len: rnd(9, 16) });
     var sx = -.16 + wind * .2;
@@ -2252,6 +2276,68 @@
       if (r.x < -50) r.x += W + 100; else if (r.x > W + 50) r.x -= W + 100;
     }
     if (--flashT <= 0) { flashScreen(false); flashT = rnd(300, 560); }
+  }
+  // ===== 氷の世界 =====
+  var ICE_WIND = .5, GUST_WIND = 2.2, GUST_WARN = 66, ICICLE_WARN = 50, ICICLE_VY = 15, ICE_SLIDE = 4.2;
+  var snow = [], gustT = 420, gustWarn = 0, gustDir = 1, iceT = 200;
+  function iceOn() { return stage === 'ice' && hm < ICE_TOP; }
+  function stepIce() {
+    if (!iceOn()) { gustWarn = 0; return; }
+    if (!snow.length) for (var i = 0; i < 90; i++) snow.push({ x: rnd(-40, W + 40), y: rnd(0, H), vy: rnd(1.4, 3.2), r: rnd(1.1, 2.8), ph: rnd(0, 6.28) });
+    for (var j = 0; j < snow.length; j++) {
+      var f = snow[j];
+      f.y += f.vy; f.ph += .03; f.x += Math.sin(f.ph) * .5 + wind * 2.2;
+      if (f.y > H + 10) { f.y = -10; f.x = rnd(-40, W + 40); }
+      if (f.x < -50) f.x += W + 100; else if (f.x > W + 50) f.x -= W + 100;
+    }
+    // 突風: 片側に矢印が出て約 1.1 秒あと、強い風が約 1.2 秒。
+    if (hm >= 200) {
+      if (gustWarn > 0) { if (--gustWarn === 0) { windTo = gustDir * GUST_WIND; windT = 70; Snd.sfx('gust'); } }
+      else if (--gustT <= 0) { gustDir = Math.random() < .5 ? -1 : 1; gustWarn = GUST_WARN; gustT = rnd(420, 720); }
+    }
+    // つらら: 予告の線が出たあと、その場所へ速く落ちる(ドローンの代わり)
+    if (hm > 150 && --iceT <= 0) {
+      if (cheer <= 0 && countFoe('debris') < 3) {
+        foes.push({ k: 'debris', ice: true, st: 'warn', t: ICICLE_WARN, x: Math.max(18, Math.min(W - 18, pl.x + pl.w / 2 + rnd(-80, 80))),
+                    oy: -50, y: camY - 50, vx: 0, vy: ICICLE_VY, rot: 0, rv: 0 });
+      }
+      iceT = rnd(120, 240);
+    }
+  }
+  function drawSnow() {
+    if (!iceOn() || !snow.length) return;
+    var a = Math.max(0, Math.min(1, (ICE_TOP - hm) / 700)) * .85;
+    ctx.save();
+    ctx.globalAlpha = a; ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    for (var j = 0; j < snow.length; j++) { var f = snow[j]; ctx.moveTo(f.x + f.r, f.y); ctx.arc(f.x, f.y, f.r, 0, 6.2832); }
+    ctx.fill();
+    ctx.restore();
+  }
+  // 突風の予告: 風が来る側のふちに、向きを示す矢印がならんで点滅する
+  function drawGustWarn() {
+    if (gustWarn <= 0) return;
+    var u = 1 - gustWarn / GUST_WARN, x0 = gustDir > 0 ? 8 : W - 8, d = gustDir;
+    ctx.save();
+    ctx.globalAlpha = (.25 + .6 * Math.abs(Math.sin(frame * (.14 + u * .3)))) ;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (var k = 0; k < 5; k++) {
+      var y = H * (.22 + k * .14), sh = ((frame * 1.2 * (1 + u)) % 22) * d;
+      for (var c = 0; c < 2; c++) {
+        var x = x0 + d * (c * 14) + sh * (c ? 0 : 1);
+        ctx.beginPath(); ctx.moveTo(x, y - 9); ctx.lineTo(x + d * 9, y); ctx.lineTo(x, y + 9);
+        ctx.strokeStyle = 'rgba(20,70,150,.75)'; ctx.lineWidth = 7; ctx.stroke();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3.5; ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+  function drawIcicle() {
+    // 明るい雪景色の上でも見えるよう、濃い青の縁取りを付ける
+    var g = ctx.createLinearGradient(0, -18, 0, 20); g.addColorStop(0, '#f2fbff'); g.addColorStop(.55, '#8fd0ff'); g.addColorStop(1, '#2f86e0');
+    ctx.fillStyle = g; ctx.strokeStyle = '#1d4f9c'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(-7, -18); ctx.lineTo(7, -18); ctx.lineTo(3, 6); ctx.lineTo(0, 20); ctx.lineTo(-3, 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(-2.5, -14); ctx.lineTo(-1.5, 2); ctx.stroke();
   }
   function drawRain() {
     if (!stormOn() || !rain.length) return;
@@ -2292,7 +2378,7 @@
   }
   function stepFoes() {
     if (cheer <= 0) {
-      if (stage !== 'storm' && hm > 240 && hm < 1500 && --droneT <= 0) {
+      if (stage === 'sky' && hm > 240 && hm < 1500 && --droneT <= 0) {
         if (countFoe('drone') < 2) {
           var d = Math.random() < .5 ? 1 : -1;
           foes.push({ k: 'drone', st: 'warn', t: 55, dir: d, x: d > 0 ? -34 : W + 34,
@@ -2300,7 +2386,7 @@
         }
         droneT = rnd(200, 420);
       }
-      if (hm > 950 && (stage !== 'storm' || hm >= STORM_TOP) && --debrisT <= 0) {
+      if (hm > 950 && (stage === 'sky' || hm >= STORM_TOP) && --debrisT <= 0) {
         if (countFoe('debris') < Math.min(3 + lv, 6)) {
           var y0 = camY - 50, x0 = rnd(0, W), vy = rnd(5.5, 8);
           var tx2 = pl.x + pl.w / 2 + rnd(-90, 90);
@@ -2345,10 +2431,11 @@
         f.x += f.vx; f.y += f.vy; f.rot += f.rv;
         if (frame % 2 === 0) {
           parts.push({ x: f.x - f.vx, y: f.y - f.vy, vx: rnd(-.8, .8), vy: rnd(-.8, .8),
-                       life: .5, c: Math.random() < .5 ? '#ff9a3d' : '#ffe08a', r: rnd(1, 3) });
+                       life: .5, c: f.ice ? (Math.random() < .5 ? '#ffffff' : '#bfe6ff') : (Math.random() < .5 ? '#ff9a3d' : '#ffe08a'), r: rnd(1, 3) });
         }
         var dx = f.x - (pl.x + pl.w / 2), dy = f.y - (pl.y + pl.h / 2);
-        if ((CH.ghost || invuln <= 0) && dx * dx + dy * dy < 24 * 24) hitFoe(f.vx >= 0 ? 1 : -1);
+        var hx = f.ice ? 12 : 24, hy = f.ice ? 22 : 24;   // つららは細長い
+        if ((CH.ghost || invuln <= 0) && (dx * dx) / (hx * hx) + (dy * dy) / (hy * hy) < 1) hitFoe(f.vx > 0 ? 1 : f.vx < 0 ? -1 : (dx < 0 ? 1 : -1));
         if (f.y > camY + H + 70) foes.splice(i, 1);
       }
     }
@@ -2399,18 +2486,19 @@
           var len = Math.sqrt(f.vx * f.vx + f.vy * f.vy);
           ctx.save();
           ctx.globalAlpha = .25 + .45 * Math.abs(Math.sin(frame * .15));
-          ctx.strokeStyle = '#ff7a4d'; ctx.lineWidth = 2; ctx.setLineDash([5, 8]);
+          ctx.strokeStyle = f.ice ? '#2f7fd8' : '#ff7a4d'; ctx.lineWidth = 2; ctx.setLineDash([5, 8]);
           ctx.beginPath(); ctx.moveTo(f.x, ey);
           ctx.lineTo(f.x + (f.vx / len) * H * 1.6, ey + (f.vy / len) * H * 1.6);
           ctx.stroke(); ctx.setLineDash([]);
           ctx.beginPath(); ctx.arc(f.x, Math.max(ey, 14), 6, 0, 6.2832);
-          ctx.fillStyle = '#ff7a4d'; ctx.fill();
+          ctx.fillStyle = f.ice ? '#2f7fd8' : '#ff7a4d'; ctx.fill();
           ctx.restore();
           continue;
         }
         if (ey < -40 || ey > H + 40) continue;
         ctx.save();
         ctx.translate(f.x, ey); ctx.rotate(f.rot);
+        if (f.ice) { drawIcicle(); ctx.restore(); continue; }
         ctx.fillStyle = '#7a8496';
         ctx.beginPath();
         for (var v = 0; v < 7; v++) {
@@ -2431,7 +2519,7 @@
     if (hm < 200) { wind = 0; windTo = 0; return; }
     if (--windT <= 0) {
       if (Math.abs(windTo) > .05) { windTo = 0; windT = rnd(240, 460); }
-      else { windTo = (Math.random() < .5 ? -1 : 1) * rnd(.5, 1.05) * (1 + .1 * lv) * (stormOn() ? STORM_WIND : 1); windT = rnd(220, 380); }
+      else { windTo = (Math.random() < .5 ? -1 : 1) * rnd(.5, 1.05) * (1 + .1 * lv) * (stormOn() ? STORM_WIND : iceOn() ? ICE_WIND : 1); windT = rnd(220, 380); }
     }
     wind += (windTo - wind) * .02;
   }
@@ -2578,6 +2666,7 @@
             // 軽い子は、乗ってもひびが入らない
             if (CH.light) Snd.sfx('jump'); else { Snd.sfx('crack'); p.crack = true; }
             pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, '#cfe6f7', 4);
+            if (stage === 'ice') pl.kx = (pl.face || 1) * ICE_SLIDE;   // 氷の世界: ガラスの足場で、向いている方へ少しすべる
           }
           else if (p.type === CLOUD) { Snd.sfx('cloud'); p.dip = 1; pl.vy = CH.light ? JMP : JMP * .6; pl.sq = .8; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffffff', 6); }
           else if (p.type === CONVEYOR) { Snd.sfx('conveyor'); pl.vy = JMP; pl.kx = p.dir * 4.2; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffc861', 4); }
@@ -2636,7 +2725,7 @@
   }
 
   function paint() {
-    if (run) Snd.music(hm >= BG_TOP_M ? 'space' : stage === 'storm' ? 'storm' : 'sky');
+    if (run) Snd.music(hm >= BG_TOP_M ? 'space' : stage === 'storm' ? 'storm' : stage === 'ice' ? 'ice' : 'sky');
     ctx.clearRect(0, 0, W, H);
     drawSky();
     drawBg();
@@ -2650,7 +2739,9 @@
     drawParts();
     drawPlayer();
     drawRain();
+    drawSnow();
     drawWind();
+    drawGustWarn();
     drawCheer();
     drawToast();
   }
@@ -2788,6 +2879,7 @@
         tone(sfxBus, t, 90, .5, { type: 'sine', to: 45, vol: .25 });
       },
       holo: function (t) { tone(sfxBus, t, 1200, .09, { type: 'sine', to: 1700, vol: .08 }); FX.jump(t); },
+      gust: function (t) { noise(sfxBus, t, 1.0, { type: 'bandpass', f: 350, to: 1500, q: 1.1, vol: .6 }); },
       updraft: function (t) { noise(sfxBus, t, .7, { type: 'bandpass', f: 500, to: 1800, q: 1.2, vol: .6 }); },
       hit: function (t) {
         noise(sfxBus, t, .18, { type: 'lowpass', f: 1500, vol: .35 });
@@ -2820,8 +2912,8 @@
     }
 
     // ----- 音楽 -----
-    var BPM = 112, BPM_STORM = 132;
-    function e8() { return 60 / (mus.mode === 'storm' ? BPM_STORM : BPM) / 2; }   // 8分音符の長さ(秒)。曲ごとに速さがちがう
+    var BPM = 112, BPM_STORM = 132, BPM_ICE = 100;
+    function e8() { return 60 / (mus.mode === 'storm' ? BPM_STORM : mus.mode === 'ice' ? BPM_ICE : BPM) / 2; }   // 8分音符の長さ(秒)。曲ごとに速さがちがう
     // 8小節。和音(アルペジオ用)、ベースの根音、メロディ [音, 8分いくつぶん](-1 は休み)
     var PROG = [[60, 64, 67, 72], [59, 62, 67, 71], [57, 60, 64, 69], [57, 60, 65, 69],
                 [60, 64, 67, 72], [59, 62, 67, 71], [57, 60, 65, 69], [59, 62, 67, 71]];
@@ -2838,8 +2930,16 @@
                  [74, 2], [77, 2], [76, 2], [74, 2], [68, 2], [71, 2], [76, 4],
                  [81, 3], [80, 1], [81, 2], [76, 2], [77, 3], [76, 1], [77, 2], [72, 2],
                  [74, 2], [69, 2], [74, 2], [77, 2], [76, 2], [75, 2], [76, 2], [-1, 2]];
+    // 氷の世界: 高く澄んだ鈴の音で、ゆったり。長調(Cmaj7-Am7-Fmaj7-G / Cmaj7-Em7-Fmaj7-G)。太鼓は無く、雪のきらめきを散らす
+    var PROG_I = [[60, 64, 67, 71], [57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 67],
+                  [60, 64, 67, 71], [52, 55, 59, 62], [53, 57, 60, 64], [55, 59, 62, 67]];
+    var ROOT_I = [36, 45, 41, 43, 36, 40, 41, 43];
+    var MEL_I = [[79, 2], [84, 2], [83, 2], [79, 2], [81, 2], [84, 2], [88, 2], [84, 2],
+                 [84, 3], [81, 1], [79, 2], [76, 2], [79, 2], [83, 2], [86, 4],
+                 [88, 3], [86, 1], [84, 2], [79, 2], [83, 2], [79, 2], [76, 2], [79, 2],
+                 [81, 2], [84, 2], [88, 2], [84, 2], [86, 2], [83, 2], [79, 4]];
     function melMap(mel) { var map = {}, pos = 0; mel.forEach(function (m) { if (m[0] > 0) map[pos] = m; pos += m[1]; }); return map; }
-    var melAt = melMap(MEL), melAtS = melMap(MEL_S);   // 何番目の8分でどの音が鳴るか
+    var melAt = melMap(MEL), melAtS = melMap(MEL_S), melAtI = melMap(MEL_I);   // 何番目の8分でどの音が鳴るか
     // 宇宙: 同じ和音を、ゆっくり広く
     var mus = { mode: null, want: null, next: 0, step: 0, timer: null };
     // 低いごろごろ(雷鳴): 小節の頭からふくらんで、ゆっくり消える。1 秒のざらざらを繰り返して長くする
@@ -2877,9 +2977,29 @@
         tone(musicBus, t, hz(m[0]) / 1.005, d, { type: 'sawtooth', vol: .045, att: .02, echo: true });
       }
     }
+    function playIce(t, st, bar, e) {
+      var E8 = e8(), ch = PROG_I[bar];
+      if (e === 0) ch.forEach(function (n) { tone(musicBus, t, hz(n - 12), E8 * 8, { type: 'sine', vol: .05, att: .7 }); });   // やわらかい厚み
+      if (e === 0) tone(musicBus, t, hz(ROOT_I[bar]), E8 * 3.2, { type: 'sine', vol: .2 });
+      if (e === 4) tone(musicBus, t, hz(ROOT_I[bar]), E8 * 3, { type: 'sine', vol: .14 });
+      // 鈴のようなアルペジオ(ひとつおき)
+      if (e % 2 === 0) tone(musicBus, t, hz(ch[(e / 2) % 4] + 12), E8 * 2.2, { type: 'sine', vol: .06, echo: true });
+      // 雪のきらめき: ときどき、和音の高い音が小さく光る
+      if (e % 4 === 1 && Math.random() < .55) tone(musicBus, t, hz(ch[(Math.random() * 4) | 0] + 24), .3, { type: 'sine', vol: .035, echo: true });
+      noise(musicBus, t, .05, { type: 'highpass', f: 8000, vol: .018 });
+      // メロディ: 鈴(基音 + 2倍音 + 少しずれた高い倍音)
+      var m = melAtI[st];
+      if (m) {
+        var f = hz(m[0]), d = E8 * m[1] * 1.9;
+        tone(musicBus, t, f, d, { type: 'sine', vol: .12, att: .005, echo: true });
+        tone(musicBus, t, f * 2, E8 * 1.2, { type: 'sine', vol: .04, att: .005 });
+        tone(musicBus, t, f * 3.01, E8 * .7, { type: 'sine', vol: .018, att: .005 });
+      }
+    }
     function playStep(t) {
       var st = mus.step % 64, bar = (st / 8) | 0, e = st % 8, ch = PROG[bar], mode = mus.mode, E8 = e8();
       if (mode === 'storm') { playStorm(t, st, bar, e); return; }
+      if (mode === 'ice') { playIce(t, st, bar, e); return; }
       if (mode === 'space') {
         if (e === 0) {
           ch.forEach(function (n) { tone(musicBus, t, hz(n - 12), E8 * 8, { type: 'sawtooth', vol: .06, att: .6 }); });
@@ -2966,7 +3086,7 @@
     fit(); initBg();
     score = 0; camY = 0; frame = 0; hm = 0; invuln = 0;
     parts = []; foes = []; plats = [];
-    droneT = 260; debrisT = 300; boltT = 220; flashT = 300; rain = []; stageNews = '';
+    droneT = 260; debrisT = 300; boltT = 220; flashT = 300; rain = []; snow = []; gustT = 420; gustWarn = 0; iceT = 200; stageNews = '';
     setStageBg();
     wind = 0; windTo = 0; windT = 260;
     goalGot = false; cheer = 0; cheerMi = 0; topMile = -1; lv = 0;
@@ -2982,7 +3102,7 @@
     recentSpine = []; recentBonus = []; afterMile = false; liftAmp = 0; liftPrev = null; lastSpine = null; lastLift = null;
     fillUpTo(-H * .6);
     pl = newPlayer();
-    Snd.unlock(); Snd.hold(false); Snd.music(stage === 'storm' ? 'storm' : 'sky', true);
+    Snd.unlock(); Snd.hold(false); Snd.music(stage === 'storm' ? 'storm' : stage === 'ice' ? 'ice' : 'sky', true);
     if (rocketOn) Snd.sfx('boost');
     vStart.classList.remove('on');
     vOver.classList.remove('on');
@@ -3145,6 +3265,7 @@
     // 単色の青がずっと残った(指定の値は変わっているのに画面の画素が変わらない)。グラデーションで指定する
     skyCss = ''; $('board').style.background = 'linear-gradient(#3f8ff0, #3f8ff0)';
     hideBg();
+    renderStage();   // 遊んでいるあいだに開いたステージを、タイトルに戻ったときに出す
     ctx.clearRect(0, 0, W, H);
     if (!titleImg.naturalWidth) return;
     var iw = titleImg.naturalWidth, ih = titleImg.naturalHeight;
