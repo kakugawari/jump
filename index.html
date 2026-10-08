@@ -108,6 +108,22 @@
     background: transparent; box-shadow: none; color: transparent;
   }
   button.hot:active { background: rgba(255,255,255,.28); transform: none; }
+  [hidden] { display: none !important; }
+  /* ステージ選び(20000m に届くと出る)。持ち物の札のすぐ上 */
+  .stagebar {
+    position: absolute; left: 0; right: 0; margin: 0 auto; width: max-content; max-width: 92%;
+    bottom: calc(21.2% + 8px + 40px); display: flex; align-items: center; height: 40px; border-radius: 999px;
+    background: rgba(20,36,96,.55); border: 2px solid rgba(255,255,255,.8); color: #fff; box-shadow: 0 2px 8px rgba(20,60,150,.3);
+  }
+  .stagebar button {
+    width: 44px; height: 40px; padding: 0; margin: 0; border: 0; border-radius: 999px;
+    background: transparent; box-shadow: none; color: #fff; font-size: 15px; letter-spacing: 0;
+  }
+  .stagebar button:active { background: rgba(255,255,255,.25); transform: none; }
+  .stagebar .sname { min-width: 104px; text-align: center; font-size: 15px; font-weight: 800; letter-spacing: .06em; text-shadow: 0 1px 2px rgba(10,30,100,.6); }
+  /* 雷雲の海を選んでいるときは、タイトルの絵を暗くする */
+  #vStart.stormsel::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(rgba(14,22,56,.6), rgba(40,52,84,.38)); }
+  #flash { position: absolute; inset: 0; background: #e4efff; opacity: 0; pointer-events: none; }
   #bStart { left: 19.4%; top: 78.8%; width: 59.8%; height: 7.4%; }
   #bChars { left: 15.6%; top: 88.2%; width: 32.9%; height: 6%; }
   #bShop { left: 51.9%; top: 88.4%; width: 32.5%; height: 5.5%; }
@@ -265,6 +281,7 @@
     <img id="space2img" class="spimg" alt="" aria-hidden="true">
     <img id="bgimg" alt="" aria-hidden="true">
     <canvas id="cv"></canvas>
+    <div id="flash"></div>
     <button id="bPause" class="pausebtn" aria-label="一時停止">❚❚</button>
 
     <div class="hud">
@@ -280,6 +297,11 @@
         <button class="hot" id="bStart" aria-label="スタート">スタート</button>
         <button class="hot" id="bChars" aria-label="キャラ選択">キャラ選択</button>
         <button class="hot" id="bShop" aria-label="ショップ">ショップ</button>
+        <div class="stagebar" id="stageBar" hidden>
+          <button id="bStagePrev" aria-label="前のステージ">◀</button>
+          <span class="sname" id="stageName">青空</span>
+          <button id="bStageNext" aria-label="次のステージ">▶</button>
+        </div>
         <div class="item-toggles" id="itemToggles"></div>
         <div class="ver" id="ver">版 2026-09-24m</div>
       </div>
@@ -386,6 +408,25 @@
     { m: 20000, t: [16, 2, 26],   b: [58, 12, 64] }
   ];
 
+  // ステージ: 最高が 20000m に届くと、2つ目が選べる。ステージごとに、背景の絵・空の色・天気がちがう
+  var STAGES = [
+    { id: 'sky', n: '青空', bg: 'stage-bg.jpg' },
+    { id: 'storm', n: '雷雲の海', bg: 'storm-bg.jpg' }
+  ];
+  var STAGE_OPEN_M = 20000;   // ここに届くと、雷雲の海が開く
+  var STORM_TOP = 2300;       // 嵐の天気(雨・風・稲妻)があるのは、ここまで。この上は宇宙
+  var SKY_STORM = [
+    { m: 0,    t: [32, 40, 62],  b: [78, 92, 118] },
+    { m: 1500, t: [24, 32, 62],  b: [48, 60, 98] },
+    { m: 2000, t: [22, 36, 96],  b: [28, 46, 116] },
+    { m: 2350, t: [24, 42, 116], b: [30, 48, 132] },
+    { m: 2800, t: [6, 8, 30],    b: [16, 18, 58] },
+    { m: 5000, t: [10, 4, 32],   b: [34, 14, 70] },
+    { m: 10000, t: [2, 12, 30],  b: [10, 46, 72] },
+    { m: 20000, t: [16, 2, 26],  b: [58, 12, 64] }
+  ];
+  var SKYS = { sky: SKY, storm: SKY_STORM };
+
   // 性能は「ジャンプ 8.9 以上」を守る（それ未満だと届かない足場が出る）
   var CHARS = [
     { key: 'usagi', n: 'バネうさぎ', tag: 'ジャンプ特化',
@@ -471,6 +512,7 @@
   var cv, ctx, W, H, dpr;
   var run = false, paused = false;
   var score = 0, best = 0;
+  var stage = 'sky', stageOpen = {}, stageBest = {};   // いま選んでいるステージ / 開いたステージ / ステージごとのベスト
   var pl, plats, parts, foes, stars;
   var camY = 0, groundY = 0, goalY = 0, genY = 0;
   var goalGot = false, cheer = 0, cheerMi = 0, topMile = -1;
@@ -815,13 +857,64 @@
     elBest.textContent = best;
   }
   function saveBest() {
+    // ベストはステージごとに持つ(簡単なステージで記録を伸ばせないように)。best は、どのステージでも最高の高さ(仲間・称号の鍵に使う)
+    if (score > (stageBest[stage] || 0)) {
+      stageBest[stage] = score;
+      try { localStorage.setItem('skyJumpStageBest', JSON.stringify(stageBest)); } catch (e) {}
+    }
+    elBest.textContent = stageBest[stage] || 0;
     if (score <= best) return;
-    best = score; elBest.textContent = best;
+    best = score;
     try { localStorage.setItem('skyHopBest', String(best)); } catch (e) {}
   }
 
+  // ステージ: 開いたかどうかは、記録とは別に持つ(記録が消えても、いちど開いたステージは閉じない)
+  function stageDef(id) { for (var i = 0; i < STAGES.length; i++) if (STAGES[i].id === id) return STAGES[i]; return STAGES[0]; }
+  function loadStage() {
+    try {
+      stageOpen = JSON.parse(localStorage.getItem('skyJumpStages') || '{}') || {};
+      stageBest = JSON.parse(localStorage.getItem('skyJumpStageBest') || 'null');
+      if (!stageBest) stageBest = { sky: best };   // ステージができる前の記録は、青空のベスト
+      var sg = localStorage.getItem('skyJumpStage');
+      if (sg && stageOpen[sg]) stage = sg;
+    } catch (e) { stageOpen = {}; stageBest = { sky: best }; }
+    if (best >= STAGE_OPEN_M && !stageOpen.storm) { stageOpen.storm = true; saveStageOpen(); }   // もう届いている人
+    if (stageOpen.storm) { var pre = new Image(); pre.src = stageDef('storm').bg; }
+    renderStage();
+  }
+  function saveStageOpen() { try { localStorage.setItem('skyJumpStages', JSON.stringify(stageOpen)); } catch (e) {} }
+  var stageNews = '';
+  function openStage(id) {
+    if (stageOpen[id]) return;
+    stageOpen[id] = true; saveStageOpen();
+    var def = stageDef(id);
+    toastQ.push('⚡ 新ステージ「' + def.n + '」が選べるようになった！');
+    stageNews = '新ステージ「' + def.n + '」が選べるようになった！';
+    var pre = new Image(); pre.src = def.bg;
+  }
+  function renderStage() {
+    $('stageBar').hidden = !stageOpen.storm;
+    $('stageName').textContent = stageDef(stage).n;
+    vStart.classList.toggle('stormsel', stage === 'storm');
+    elBest.textContent = stageBest[stage] || 0;
+  }
+  function cycleStage(d) {
+    var open = STAGES.filter(function (st) { return st.id === 'sky' || stageOpen[st.id]; });   // 青空は、はじめから開いている
+    if (open.length < 2) return;
+    var i = 0; for (var k = 0; k < open.length; k++) if (open[k].id === stage) i = k;
+    stage = open[(i + d + open.length) % open.length].id;
+    try { localStorage.setItem('skyJumpStage', stage); } catch (e) {}
+    renderStage();
+  }
+  // 背景の絵はステージごと。変えたときだけ読み直す
+  var bgSrc = 'stage-bg.jpg';
+  function setStageBg() {
+    var src = stageDef(stage).bg;
+    if (src !== bgSrc) { bgSrc = src; bgEl.src = src; bgKey = ''; }
+  }
+
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-10-08a';
+  var VERSION = '版 2026-10-09a';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -862,10 +955,10 @@
   }
 
   function skyPair() {
-    var a = SKY[0], b = SKY[0];
-    for (var i = 0; i < SKY.length; i++) {
-      if (SKY[i].m <= hm) { a = SKY[i]; b = SKY[i]; }
-      if (SKY[i].m > hm) { b = SKY[i]; break; }
+    var T = SKYS[stage] || SKY, a = T[0], b = T[0];
+    for (var i = 0; i < T.length; i++) {
+      if (T[i].m <= hm) { a = T[i]; b = T[i]; }
+      if (T[i].m > hm) { b = T[i]; break; }
     }
     var t = b.m === a.m ? 0 : (hm - a.m) / (b.m - a.m);
     function mix(c1, c2) {
@@ -2118,6 +2211,66 @@
     if (!(pl.ghostT > 0)) { Snd.sfx('cloud'); burst(pl.x + pl.w / 2, pl.y + pl.h / 2, '#ffffff', 6); }
     pl.ghostT = 16;
   }
+  // ===== 天気(雷雲の海) =====
+  var BOLT_WARN = 72, STORM_WIND = 1.4;
+  var rain = [], boltT = 220, flashT = 300, flashEl = $('flash');
+  function stormOn() { return stage === 'storm' && hm < STORM_TOP; }
+  // 画面を白く一瞬光らせる(Web Animations API: 同じコマで書き換えると、途中が描かれない)
+  function flashScreen(strong) {
+    if (!flashEl.animate) return;
+    flashEl.animate(strong ? [{ opacity: 0 }, { opacity: .7 }, { opacity: .1 }, { opacity: .5 }, { opacity: 0 }]
+                           : [{ opacity: 0 }, { opacity: .32 }, { opacity: 0 }, { opacity: .2 }, { opacity: 0 }], { duration: strong ? 420 : 560 });
+  }
+  function boltPts(x) {
+    var pts = [[x, -10]], cx = x;
+    for (var y = 28; y < H + 40; y += 38) { cx = Math.max(x - 20, Math.min(x + 20, cx + rnd(-16, 16))); pts.push([cx, y]); }
+    return pts;
+  }
+  function stepWeather() {
+    if (!stageOpen.storm && hm >= STAGE_OPEN_M) openStage('storm');
+    if (!stormOn()) return;
+    if (!rain.length) for (var i = 0; i < 70; i++) rain.push({ x: rnd(-40, W + 40), y: rnd(0, H), vy: rnd(15, 22), len: rnd(9, 16) });
+    var sx = -.16 + wind * .2;
+    for (var j = 0; j < rain.length; j++) {
+      var r = rain[j];
+      r.y += r.vy; r.x += sx * r.vy;
+      if (r.y > H + 20) { r.y = -20; r.x = rnd(-40, W + 40); }
+      if (r.x < -50) r.x += W + 100; else if (r.x > W + 50) r.x -= W + 100;
+    }
+    if (--flashT <= 0) { flashScreen(false); flashT = rnd(300, 560); }
+  }
+  function drawRain() {
+    if (!stormOn() || !rain.length) return;
+    var a = Math.max(0, Math.min(1, (STORM_TOP - hm) / 700)) * .5, sx = -.16 + wind * .2;
+    ctx.save();
+    ctx.globalAlpha = a; ctx.strokeStyle = '#cfe0ff'; ctx.lineWidth = 1.3; ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (var j = 0; j < rain.length; j++) { var r = rain[j]; ctx.moveTo(r.x, r.y); ctx.lineTo(r.x + sx * r.len, r.y + r.len); }
+    ctx.stroke();
+    ctx.restore();
+  }
+  function drawBolt(f) {
+    ctx.save();
+    if (f.st === 'warn') {
+      var u = Math.max(0, Math.min(1, 1 - f.t / BOLT_WARN));
+      // 当たる幅の柱が、だんだん濃くなり、線は近づくほど速く点滅する
+      ctx.globalAlpha = .05 + .12 * u; ctx.fillStyle = '#cfe0ff'; ctx.fillRect(f.x - 13, 0, 26, H);
+      ctx.globalAlpha = .25 + .55 * Math.abs(Math.sin(frame * (.12 + u * .3)));
+      ctx.strokeStyle = '#d8e6ff'; ctx.lineWidth = 2; ctx.setLineDash([6, 8]);
+      ctx.beginPath(); ctx.moveTo(f.x, 0); ctx.lineTo(f.x, H); ctx.stroke(); ctx.setLineDash([]);
+      ctx.globalAlpha = .5 + .5 * u; ctx.fillStyle = '#fff3a0';
+      ctx.beginPath(); ctx.arc(f.x, 22, 4 + u * 5, 0, 6.2832); ctx.fill();
+    } else {
+      ctx.globalCompositeOperation = 'lighter'; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      var fade = Math.min(1, f.t / 6);
+      ctx.beginPath(); ctx.moveTo(f.pts[0][0], f.pts[0][1]);
+      for (var q = 1; q < f.pts.length; q++) ctx.lineTo(f.pts[q][0], f.pts[q][1]);
+      ctx.globalAlpha = .35 * fade; ctx.strokeStyle = '#8fb4ff'; ctx.lineWidth = 30; ctx.stroke();
+      ctx.globalAlpha = .8 * fade; ctx.strokeStyle = '#dce9ff'; ctx.lineWidth = 8; ctx.stroke();
+      ctx.globalAlpha = fade; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.stroke();
+    }
+    ctx.restore();
+  }
   function countFoe(k) {
     var n = 0;
     for (var i = 0; i < foes.length; i++) if (foes[i].k === k) n++;
@@ -2125,7 +2278,7 @@
   }
   function stepFoes() {
     if (cheer <= 0) {
-      if (hm > 240 && hm < 1500 && --droneT <= 0) {
+      if (stage !== 'storm' && hm > 240 && hm < 1500 && --droneT <= 0) {
         if (countFoe('drone') < 2) {
           var d = Math.random() < .5 ? 1 : -1;
           foes.push({ k: 'drone', st: 'warn', t: 55, dir: d, x: d > 0 ? -34 : W + 34,
@@ -2133,7 +2286,7 @@
         }
         droneT = rnd(200, 420);
       }
-      if (hm > 950 && --debrisT <= 0) {
+      if (hm > 950 && (stage !== 'storm' || hm >= STORM_TOP) && --debrisT <= 0) {
         if (countFoe('debris') < Math.min(3 + lv, 6)) {
           var y0 = camY - 50, x0 = rnd(0, W), vy = rnd(5.5, 8);
           var tx2 = pl.x + pl.w / 2 + rnd(-90, 90);
@@ -2145,8 +2298,24 @@
         debrisT = rnd(170, 330) / (1 + .25 * lv);
       }
     }
+    // 稲妻(雷雲の海): 予告の線が出て、約 1.2 秒あと、その場所に画面の上から下まで落ちる。横へ動けば避けられる
+    if (cheer <= 0 && stage === 'storm' && hm > 150 && hm < STORM_TOP && --boltT <= 0) {
+      if (countFoe('bolt') < 2) {
+        foes.push({ k: 'bolt', st: 'warn', t: BOLT_WARN, x: Math.max(24, Math.min(W - 24, pl.x + pl.w / 2 + rnd(-60, 60))), y: 0, oy: 0 });
+      }
+      boltT = rnd(150, 300);
+    }
     for (var i = foes.length - 1; i >= 0; i--) {
       var f = foes[i];
+      if (f.k === 'bolt') {
+        if (f.st === 'warn') {
+          if (--f.t <= 0) { f.st = 'go'; f.t = 12; f.pts = boltPts(f.x); flashScreen(true); Snd.sfx('thunder'); }
+        } else {
+          if ((CH.ghost || invuln <= 0) && pl.x + pl.w > f.x - 13 && pl.x < f.x + 13) hitFoe(pl.x + pl.w / 2 < f.x ? -1 : 1);
+          if (--f.t <= 0) foes.splice(i, 1);
+        }
+        continue;
+      }
       if (f.st === 'warn') {
         f.y = camY + f.oy;
         if (--f.t <= 0) f.st = 'go';
@@ -2182,6 +2351,7 @@
   function drawFoes() {
     for (var i = 0; i < foes.length; i++) {
       var f = foes[i];
+      if (f.k === 'bolt') { drawBolt(f); continue; }
       if (f.k === 'drone') {
         if (f.st === 'warn') { edgeWarn(f.dir, f.y - camY); continue; }
         var y = f.y + Math.sin(f.bob) * 10 - camY;
@@ -2247,7 +2417,7 @@
     if (hm < 200) { wind = 0; windTo = 0; return; }
     if (--windT <= 0) {
       if (Math.abs(windTo) > .05) { windTo = 0; windT = rnd(240, 460); }
-      else { windTo = (Math.random() < .5 ? -1 : 1) * rnd(.5, 1.05) * (1 + .1 * lv); windT = rnd(220, 380); }
+      else { windTo = (Math.random() < .5 ? -1 : 1) * rnd(.5, 1.05) * (1 + .1 * lv) * (stormOn() ? STORM_WIND : 1); windT = rnd(220, 380); }
     }
     wind += (windTo - wind) * .02;
   }
@@ -2429,6 +2599,7 @@
       }
     }
 
+    stepWeather();
     stepFoes();
     stepSpace();
 
@@ -2463,6 +2634,7 @@
     drawFoes();
     drawParts();
     drawPlayer();
+    drawRain();
     drawWind();
     drawCheer();
     drawToast();
@@ -2595,6 +2767,11 @@
         noise(sfxBus, t, .14, { type: 'bandpass', f: 1800, vol: .12 });
         FX.jump(t);
       },
+      thunder: function (t) {
+        noise(sfxBus, t, .09, { type: 'highpass', f: 2500, vol: .5 });
+        noise(sfxBus, t + .05, 1.1, { type: 'lowpass', f: 500, to: 80, vol: .6 });
+        tone(sfxBus, t, 90, .5, { type: 'sine', to: 45, vol: .25 });
+      },
       holo: function (t) { tone(sfxBus, t, 1200, .09, { type: 'sine', to: 1700, vol: .08 }); FX.jump(t); },
       updraft: function (t) { noise(sfxBus, t, .7, { type: 'bandpass', f: 500, to: 1800, q: 1.2, vol: .6 }); },
       hit: function (t) {
@@ -2720,7 +2897,8 @@
     fit(); initBg();
     score = 0; camY = 0; frame = 0; hm = 0; invuln = 0;
     parts = []; foes = []; plats = [];
-    droneT = 260; debrisT = 300;
+    droneT = 260; debrisT = 300; boltT = 220; flashT = 300; rain = []; stageNews = '';
+    setStageBg();
     wind = 0; windTo = 0; windT = 260;
     goalGot = false; cheer = 0; cheerMi = 0; topMile = -1; lv = 0;
     runTitles = []; runUnlocks = []; toastQ = []; toastT = 0;
@@ -2771,9 +2949,11 @@
     $('oCoin').textContent = got > 0 ? ('+' + got + ' コイン' + (CH.coin ? '(' + CH.coin + '倍)' : '')) : '';
     var news = runUnlocks.map(function (n) { return n + 'が仲間になった！'; });
     if (runTitles.length) news.push('称号「' + runTitles.join('」「') + '」を手に入れた！');
+    if (stageNews) { news.push(stageNews); stageNews = ''; }
+    var sb = stageBest[stage] || 0;
     elNote.textContent = news.length ? news.join(' ')
       : topMile >= 0 ? mileName(topMile) + '(' + mileAt(topMile) + 'm)に到達'
-      : (score >= best && score > 0 ? 'ベスト更新' : 'ベストまで あと ' + Math.max(1, best - score) + 'm');
+      : (score >= sb && score > 0 ? 'ベスト更新' : 'ベストまで あと ' + Math.max(1, sb - score) + 'm');
     vOver.classList.add('on');
   }
 
@@ -2855,6 +3035,8 @@
   });
 
   $('bStart').addEventListener('click', start);
+  $('bStagePrev').addEventListener('click', function () { cycleStage(-1); });
+  $('bStageNext').addEventListener('click', function () { cycleStage(1); });
   $('bRetry').addEventListener('click', start);
   $('bChange').addEventListener('click', function () {
     vOver.classList.remove('on');
@@ -2904,6 +3086,7 @@
 
   loadSprites();
   loadBest();
+  loadStage();
   applyChar();
   buildPicker();
   groundY = H - 30;
