@@ -444,14 +444,14 @@
   // 性能は「ジャンプ 8.9 以上」を守る（それ未満だと届かない足場が出る）
   var CHARS = [
     { key: 'usagi', n: 'バネうさぎ', tag: 'ジャンプ特化',
-      jump: 11.2, speed: 4.6, grav: 1.0, wind: 1.0, boost: 1.1,
-      t: 'ぴょーん！と高く跳ぶのが得意！ばね床とロケット床も、よく効く。誰よりも高く、空を目指そう！' },
+      jump: 11.2, speed: 4.6, grav: 1.0, wind: 1.0, boost: 1.1, slide: 1.5,
+      t: 'ぴょーん！と高く跳ぶのが得意！ばね床とロケット床も、よく効く。そのかわり、氷の床ではよくすべる。誰よりも高く、空を目指そう！' },
     { key: 'kumo', n: 'わたぐも', tag: 'ふわふわ浮く',
-      jump: 9.4, speed: 4.9, grav: .78, wind: 1.25, light: true, ghost: true,
-      t: 'ふわふわと浮かぶのが得意！軽くて雲もガラスも平気、ドローンも隕石もすり抜ける。' },
+      jump: 9.4, speed: 4.9, grav: .78, wind: 2.0, light: true, ghost: true,
+      t: 'ふわふわと浮かぶのが得意！軽くて雲もガラスも平気、ドローンも隕石も雷もつららもすり抜ける。そのかわり、風には2倍流される。' },
     { key: 'ninja', n: 'たまご忍者', tag: 'ムササビの術',
-      jump: 9.8, speed: 5.6, grav: 1.0, wind: .6, glide: true,
-      t: 'ムササビの術で、落ちるときはゆっくり滑空！横の動きが速く、風にも強い。' },
+      jump: 9.8, speed: 5.6, grav: 1.0, wind: .6, glide: true, slide: 0,
+      t: 'ムササビの術で、落ちるときはゆっくり滑空！横の動きが速く、風にも強い。氷の床でもすべらない。' },
     { key: 'king', n: 'スターキング', tag: '全部乗せ最強', unlockM: 10000, coin: 1.5, tough: true,
       jump: 11.2, speed: 6.2, grav: .82, wind: .45,
       t: 'ジャンプも浮遊も報酬も全部そろった王さま！コインが1.5倍。' }
@@ -933,7 +933,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-10-12b';
+  var VERSION = '版 2026-10-12c';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -2727,7 +2727,7 @@
             // 軽い子は、乗ってもひびが入らない
             if (CH.light) Snd.sfx('jump'); else { Snd.sfx('crack'); p.crack = true; }
             pl.vy = JMP; burst(pl.x + pl.w / 2, pl.y + pl.h, '#cfe6f7', 4);
-            if (stage === 'ice') pl.kx = (pl.face || 1) * ICE_SLIDE;   // 氷の世界: ガラスの足場で、向いている方へ少しすべる
+            if (stage === 'ice') pl.kx = (pl.face || 1) * ICE_SLIDE * (CH.slide === undefined ? 1 : CH.slide);   // 氷の世界: ガラスの足場で、向いている方へ少しすべる
           }
           else if (p.type === CLOUD) { Snd.sfx('cloud'); p.dip = 1; pl.vy = CH.light ? JMP : JMP * .6; pl.sq = .8; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffffff', 6); }
           else if (p.type === CONVEYOR) { Snd.sfx('conveyor'); pl.vy = JMP; pl.kx = p.dir * 4.2; burst(pl.x + pl.w / 2, pl.y + pl.h, '#ffc861', 4); }
