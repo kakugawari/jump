@@ -914,7 +914,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-10-10a';
+  var VERSION = '版 2026-10-10b';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -2138,6 +2138,14 @@
       ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(cx, cy, hr, Math.PI * 1.1, Math.PI * 1.45); ctx.stroke();
     }
+    // 感電中: まわりに小さな稲妻がはじける
+    if (pl.shockT > 0) {
+      ctx.globalAlpha = 1; ctx.strokeStyle = '#fff3a0'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      for (var q = 0; q < 3; q++) {
+        var qa = frame * .9 + q * 2.1, qx = cx + Math.cos(qa) * 20, qy = cy + Math.sin(qa) * 18;
+        ctx.beginPath(); ctx.moveTo(qx, qy); ctx.lineTo(qx + rnd(-7, 7), qy + rnd(-7, 7)); ctx.lineTo(qx + rnd(-10, 10), qy + rnd(-10, 10)); ctx.stroke();
+      }
+    }
     ctx.restore();
   }
 
@@ -2190,7 +2198,7 @@
   }
 
   // ===== じゃまもの =====
-  function knock(dx, down) {
+  function knock(dx, down, push) {
     if (invuln > 0 || rocketOn) return;
     Snd.sfx('hit');
     if (CH.tough) {
@@ -2201,12 +2209,18 @@
     }
     invuln = 85;
     pl.vy = Math.max(pl.vy, down || 2.6);
-    pl.kx = dx * 3.6;
-    burst(pl.x + pl.w / 2, pl.y + pl.h / 2, '#dbe6f2', 8);
+    pl.kx = dx * (push || 3.6);
+    burst(pl.x + pl.w / 2, pl.y + pl.h / 2, down ? '#fff3a0' : '#dbe6f2', down ? 16 : 8);
   }
   // 敵に当たった: すり抜ける子(ghost)は、薄くなるだけで落とされない。ふつうの子は、はじかれる
-  function hitFoe(dx) {
-    if (!CH.ghost) { knock(dx); return; }
+  // 稲妻は、ドローン・隕石より強く(下へ強く落とされ、横へも大きく飛ばされる)
+  var BOLT_DOWN = 5, BOLT_PUSH = 5, BOLT_STUN = 30;   // 感電: しばらく左右に動けない(BOLT_STUN コマ)
+  function hitFoe(dx, bolt) {
+    if (!CH.ghost) {
+      if (bolt) { var was = invuln; knock(dx, BOLT_DOWN, BOLT_PUSH); if (invuln > was && !CH.tough) pl.shockT = BOLT_STUN; }
+      else knock(dx);
+      return;
+    }
     if (rocketOn) return;
     if (!(pl.ghostT > 0)) { Snd.sfx('cloud'); burst(pl.x + pl.w / 2, pl.y + pl.h / 2, '#ffffff', 6); }
     pl.ghostT = 16;
@@ -2311,7 +2325,7 @@
         if (f.st === 'warn') {
           if (--f.t <= 0) { f.st = 'go'; f.t = 12; f.pts = boltPts(f.x); flashScreen(true); Snd.sfx('thunder'); Snd.duck(.3); }
         } else {
-          if ((CH.ghost || invuln <= 0) && pl.x + pl.w > f.x - 13 && pl.x < f.x + 13) hitFoe(pl.x + pl.w / 2 < f.x ? -1 : 1);
+          if ((CH.ghost || invuln <= 0) && pl.x + pl.w > f.x - 13 && pl.x < f.x + 13) hitFoe(pl.x + pl.w / 2 < f.x ? -1 : 1, true);
           if (--f.t <= 0) foes.splice(i, 1);
         }
         continue;
@@ -2491,6 +2505,7 @@
       if (touchX < c - 8) mv = -CH.speed;
       else if (touchX > c + 8) mv = CH.speed;
     }
+    if (pl.shockT > 0) { mv = 0; pl.shockT--; if (frame % 3 === 0) burst(pl.x + pl.w / 2, pl.y + pl.h / 2, '#fff3a0', 2); }   // 感電中は動けない
     if (mv) pl.face = mv > 0 ? 1 : -1;
     pl.x += mv + wind * 1.9 * CH.wind;
 
