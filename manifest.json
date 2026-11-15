@@ -1,6 +1,6 @@
 {
-  "name": "スカイホッパー",
-  "short_name": "スカイホッパー",
+  "name": "スカイジャンパー",
+  "short_name": "スカイジャンパー",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

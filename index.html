@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
-<title>スカイホッパー</title>
+<title>スカイジャンパー</title>
 <meta name="theme-color" content="#2b2740">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="スカイホッパー">
+<meta name="apple-mobile-web-app-title" content="スカイジャンパー">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icon-192.png">
@@ -58,7 +58,7 @@
 
   .hud {
     position: absolute; top: 0; left: 0; right: 0;
-    padding: calc(env(safe-area-inset-top) + 10px) 62px 0 14px;
+    padding: calc(env(safe-area-inset-top) + 10px) 68px 0 14px;
     display: flex; align-items: baseline; gap: 12px;
     pointer-events: none; z-index: 5;
     text-shadow: 0 2px 8px rgba(0,0,0,.6);
@@ -66,11 +66,15 @@
   .h-num { font-size: 30px; font-weight: 800; letter-spacing: -.01em; color: #fff; font-variant-numeric: tabular-nums; }
   .h-unit { font-size: 13px; opacity: .75; margin-left: 3px; font-weight: 600; }
   .h-best { margin-left: auto; font-size: 12px; opacity: .7; font-weight: 600; }
+  .h-best.new { color: #ffe27a; opacity: 1; }
+  /* 拾ったコイン(その回のぶん) */
+  .h-coin { display: flex; align-items: center; gap: 4px; align-self: center; font-size: 13px; font-weight: 800; color: #ffe27a; font-variant-numeric: tabular-nums; }
+  .h-coin i { width: 13px; height: 13px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff3a0, #ffc21a 60%, #e89a00); box-shadow: 0 0 0 1px rgba(120,70,0,.55); }
 
   .pausebtn {
     position: absolute; z-index: 6;
-    top: calc(env(safe-area-inset-top) + 8px); right: 14px;
-    width: 38px; height: 38px; padding: 0; border-radius: 50%;
+    top: calc(env(safe-area-inset-top) + 5px); right: 12px;
+    width: 44px; height: 44px; padding: 0; border-radius: 50%;
     display: none; align-items: center; justify-content: center;
     background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.3);
     color: #fff; font-size: 13px; letter-spacing: 1px;
@@ -272,7 +276,16 @@
 
   .shop-row.off { opacity: .55; }
   .ver { margin-top: 8px; font-size: 10px; opacity: .45; letter-spacing: .05em; }
-  .oCoin { color: var(--lime); font-size: 13px; font-weight: 700; min-height: 1.2em; margin: -8px 0 10px; }
+  .oCoin { color: var(--lime); font-size: 13px; font-weight: 700; min-height: 1.2em; margin: 6px 0 10px; }
+  .obest { font-size: 12px; font-weight: 700; opacity: .7; margin-top: -2px; }
+  .newrec {
+    display: inline-block; margin: 0 0 6px; padding: 4px 14px; border-radius: 999px; font-size: 13px; font-weight: 800; letter-spacing: .1em;
+    color: #5a3a00; background: linear-gradient(#fff3a0, #ffc21a); box-shadow: 0 0 0 2px rgba(255,255,255,.7), 0 4px 16px rgba(255,190,40,.5);
+    animation: recpop 1s ease-in-out infinite;
+  }
+  @keyframes recpop { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+  /* 落ちた直後は、ボタンを一瞬だけ押せなくする(指を動かしていた勢いで、結果を見る前に「もう一度」を押してしまう) */
+  .veil.lock button { pointer-events: none; }
 </style>
 </head>
 <body>
@@ -287,6 +300,7 @@
 
     <div class="hud">
       <div><span class="h-num" id="hM">0</span><span class="h-unit">m</span></div>
+      <div class="h-coin"><i></i><span id="hCoin">0</span></div>
       <div class="h-best">ベスト <span id="hBest">0</span>m</div>
     </div>
 
@@ -333,7 +347,9 @@
     <div class="veil" id="vOver">
       <div class="card">
         <h2>落下</h2>
+        <div><span class="newrec" id="oNew" hidden>★ ベスト更新 ★</span></div>
         <div class="big"><span id="oM">0</span><span style="font-size:18px">m</span></div>
+        <div class="obest" id="oBest"></div>
         <div class="oCoin" id="oCoin"></div>
         <div class="note" id="oNote"></div>
         <button id="bRetry">もう一度</button>
@@ -391,11 +407,14 @@
 
   var BEAM = 0, GONDOLA = 1, TRAMPO = 2, BOOST = 3,
       GLASS = 4, CLOUD = 5, HOLO = 6, STATION = 7,
-      CONVEYOR = 8, CRUMBLE = 9, MILE = 10, UPDRAFT = 11, ELEVATOR = 12;
+      CONVEYOR = 8, CRUMBLE = 9, MILE = 10, UPDRAFT = 11, ELEVATOR = 12, ORBIT = 13;
+  // まわる足場(宇宙のおまけ): 中心のまわりを、横 ORB_RX・縦 ORB_RY の輪でまわる
+  var ORB_RX = 46, ORB_RY = 30;
   var UPDRAFT_H = 170;      // 上昇気流の柱の高さ(下端が p.y)
   // エレベーター: もとの位置(by)から上下に ±LIFT_AMP 往復する道すじの足場。
   // 動いたぶんだけ、前後の足場との間隔が広がっても届くよう、間隔の上限から振れ幅を引いて作る
   var LIFT_AMP = 40, LIFT_AMP_LOW = 100;
+  var MAX_DX = 235;   // 空の道すじ: となりの足場との横の隙間(ふちからふち)の上限
 
   var SKY = [
     // 背景の絵の色に合わせる(絵が読めないとき・絵を薄くしたあとに見える)。2000m から先は暗い宇宙へ
@@ -538,9 +557,14 @@
   var droneT = 0, debrisT = 0;
   var wind = 0, windTo = 0, windT = 260;
   var raf = null;
+  // コイン(拾った数)・ごほうびのコイン・続けて拾った数 / 落ちているアイテム / じしゃくの残り / 画面のゆれ / 一時停止明けの秒読み
+  var coinsW = [], picked = 0, bonusC = 0, comboN = 0, comboT = 0, items = [], magT = 0, shake = 0, resumeT = 0;
+  var runBest0 = 0, bestPassed = false;   // この回を始めたときのベスト(線を引く高さ)と、越えたかどうか
+  // UFO が出るまで / 流星群が来るまで・続く残り・向き・その間に当たったか
+  var ufoT = 0, ufoSeen = false, showerT = 0, showerOn = 0, showerDir = 1, showerHit = false;
 
   var $ = function (id) { return document.getElementById(id); };
-  var elM = $('hM'), elBest = $('hBest'), elOM = $('oM'), elNote = $('oNote');
+  var elM = $('hM'), elBest = $('hBest'), elOM = $('oM'), elNote = $('oNote'), elCoin = $('hCoin');
   var vStart = $('vStart'), vChars = $('vChars'), vMenu = $('vMenu'), vOver = $('vOver'), vPause = $('vPause'), vShop = $('vShop'), vTitles = $('vTitles'), bPause = $('bPause');
 
   function rr(x, y, w, h, r) {
@@ -662,7 +686,9 @@
   function saveOwned() { try { localStorage.setItem('skyHopOwned', JSON.stringify(owned)); } catch (e) {} }
   function addCoins(n) { coins += n; saveCoins(); renderCoinUI(); }
   // ロケットで飛んだぶんは数えない(数えると、使うたびに値段より多くのコインが入って得をする)
-  function runCoins() { return Math.floor(Math.max(0, score - (rocketUsed ? ROCKET_M : 0)) * (CH.coin || 1)); }
+  // 拾ったコイン(1 枚 COIN_V)と、ごほうび(流星群をよけきった等)も足す
+  var COIN_V = 5;
+  function runCoins() { return Math.floor((Math.max(0, score - (rocketUsed ? ROCKET_M : 0)) + picked * COIN_V + bonusC) * (CH.coin || 1)); }
   function renderCoinUI() {
     var el = $('coinCount'); if (el) el.textContent = coins;
     var el2 = $('shopCoinCount'); if (el2) el2.textContent = coins;
@@ -933,7 +959,7 @@
   }
 
   // 写真1枚で届いた版と高さが分かるよう、版の横に「描ける / 渡された / vh」を出す
-  var VERSION = '版 2026-10-12e';
+  var VERSION = '版 2026-11-15a';
   function vhPx() {
     var b = document.createElement('div');
     b.style.cssText = 'position:absolute;left:0;top:0;width:0;height:100vh;visibility:hidden;';
@@ -949,8 +975,10 @@
     cv = $('cv');
     ctx = cv.getContext('2d');
     var r = cv.getBoundingClientRect();
+    if ((r.width < 1 || r.height < 1) && W) return;   // 回転中などに一瞬 0 で渡ってくる。その値で組み直さない
     dpr = window.devicePixelRatio || 1;
     W = r.width; H = r.height;
+    coinFr = null; itemFr = null;   // 小さな絵は画素の倍率ごとに作り直す
     cv.width = Math.round(W * dpr);
     cv.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1199,9 +1227,10 @@
     }
     if (m < 300) return r < .35 ? CRUMBLE : GLASS;
     if (m < 900) { if (r < .34) return CLOUD; if (r < .6) return GLASS; return CRUMBLE; }
-    if (m >= GOAL_M) {   // 宇宙に雲は無い
-      if (r < .4) return HOLO;
-      if (r < .7) return GLASS;
+    if (m >= GOAL_M) {   // 宇宙に雲は無い。かわりに、まわる足場
+      if (r < .34) return ORBIT;
+      if (r < .6) return HOLO;
+      if (r < .82) return GLASS;
       return CRUMBLE;
     }
     if (r < .3) return HOLO;
@@ -1237,7 +1266,8 @@
         var o = others[i];
         if (!o || o.w >= W - 1) continue;
         if (o.type === GONDOLA) return null;   // 左右に動く足場は端から端まで往復するので、近くには置けない
-        if (x - w * .2 < o.x + o.w * 1.2 + 8 && o.x - o.w * .2 < x + w * 1.2 + 8) { ok = false; break; }
+        var ox = o.fx !== undefined ? o.fx : o.x, ow = o.fw || o.w;   // まわる足場は、動く範囲ぜんぶ
+        if (x - w * .2 < ox + ow * 1.2 + 8 && ox - ow * .2 < x + w * 1.2 + 8) { ok = false; break; }
       }
       if (ok) return x;
     }
@@ -1298,15 +1328,22 @@
           if (nx === null) { liftPrev.amp = 0; liftPrev.y = liftPrev.by; } else sx = nx;
         }
       }
+      // 横にも届くように: 前の道すじから横の隙間が MAX_DX を超えるなら、そのぶん寄せる。両端に細い足場が続くと、
+      // いちばん遅い子(バネうさぎ 4.6)が、跳んでいるあいだ横へ進める距離(約 240pt)より遠くなることがあった(約 3000 枚に 1 枚)
+      if (!low && lastSpine && lastSpine.w < W - 1 && lastSpine.type !== GONDOLA && t !== GONDOLA) {
+        var gxd = Math.max(sx - (lastSpine.x + lastSpine.w), lastSpine.x - (sx + w));
+        if (gxd > MAX_DX) sx += (sx > lastSpine.x ? -1 : 1) * (gxd - MAX_DX);
+      }
       var sp = mk(sx, ny, t, w);
       sp.sp *= 1 + .15 * L;
       if (t === ELEVATOR) { sp.amp = amp; sp.lw = low ? rnd(.014, .022) : rnd(.02, .03); sp.y = liftY(sp); lastLift = sp; }
+      var prevSp = lastSpine;
       liftAmp = t === ELEVATOR ? amp : 0; liftPrev = t === ELEVATOR ? sp : null; lastSpine = sp;
       plats.push(sp);
       // 道すじは届く間隔の保証があるので動かさない。先に置いたおまけと重なったら、おまけの方を取り除く
       for (var bi = recentBonus.length - 1; bi >= 0; bi--) {
         var ob = recentBonus[bi];
-        if (Math.abs(ob.y - sp.y) < 140 && freeX(ob.w, [sp], ob.x) === null) {
+        if (Math.abs(ob.by - sp.by) < 140 + (sp.amp || 0) && freeX(ob.fw || ob.w, [sp], ob.fx !== undefined ? ob.fx : ob.x) === null) {
           var at = plats.indexOf(ob);
           if (at >= 0) plats.splice(at, 1);
           recentBonus.splice(bi, 1);
@@ -1323,16 +1360,19 @@
         var bt = m >= 300 && Math.random() < (iceLow ? .08 : .2) ? UPDRAFT : bonusType(m);
         // 幅は mk() と同じく 44pt 未満にはしない(細いまま位置を決めると、広げたぶん重なった)
         var bw = Math.max(44, bt === UPDRAFT ? 56 : base * wmul(m, bt) * .88 * thin);
-        var bx = freeX(bw, recentSpine.concat([sp], placed));
+        // まわる足場は、動く範囲(幅 + 輪の横幅)がまるごと空いている所にだけ置く
+        var orb = bt === ORBIT, bx = freeX(orb ? bw + ORB_RX * 2 : bw, recentSpine.concat([sp], placed));
         if (bx !== null) {
           // 2 枚目は、1 枚目と上下にもずらす(間隔の上半分と下半分)
           var fr = nb === 2 ? (bn === 0 ? .3 + Math.random() * .12 : .58 + Math.random() * .12) : .35 + Math.random() * .3;
-          var bp = mk(bx, ny + g * fr, bt, bw);
+          var bp = mk(orb ? bx + ORB_RX : bx, ny + g * fr, bt, bw);
+          if (orb) { bp.ox = bp.x; bp.fx = bx; bp.fw = bw + ORB_RX * 2; bp.lw = rnd(.02, .03) * (Math.random() < .5 ? -1 : 1); }
           bp.bonus = true;
           plats.push(bp);
           recentBonus.push(bp); placed.push(bp);
         }
       }
+      if (!afterMile) { placeCoins(sp, prevSp, m); placeItem(sp, m); }
       recentSpine.push(sp);
       // 近くの物は個数ではなく上下の距離(200pt 以内)で覚える。個数で切ると、おまけが続いたときに漏れた
       recentSpine = recentSpine.filter(function (o) { return o.y - sp.y < 200; });
@@ -1340,6 +1380,158 @@
       afterMile = false;
       genY = ny;
     }
+  }
+
+  // ===== コインとアイテム =====
+  // コイン: 道すじの足場の真上に縦に並べるか、前の足場からこの足場へ弧を描いて並べる。跳ぶ通り道に置くので、ふつうに登れば少し拾え、
+  // 寄り道すればもっと拾える。ばね床・ロケット床の上は、高く長く並べる(打ち上げられた先まで続く)
+  function placeCoins(sp, prev, m) {
+    if (m < 40) return;
+    var moving = sp.type === GONDOLA || sp.type === ELEVATOR, r = Math.random(), k = sp.y < goalY ? 1.5 : 1, i;
+    var cx = sp.x + sp.w / 2;
+    if (!moving && (sp.type === TRAMPO || sp.type === BOOST) && r < .7) {
+      var nb = sp.type === BOOST ? 8 : 5, stp = (sp.type === BOOST ? 46 : 36) * k;
+      for (i = 0; i < nb; i++) coinsW.push({ x: cx, y: sp.y - 50 - i * stp });
+    } else if (!moving && r < .12) {
+      var n = 3 + (Math.random() < .4 ? 1 : 0);
+      for (i = 0; i < n; i++) coinsW.push({ x: cx, y: sp.y - 44 - i * 26 * k });
+    } else if (r < .23 && !moving && prev && prev.w < W - 1 && prev.type !== GONDOLA && prev.type !== ELEVATOR) {
+      var ax = prev.x + prev.w / 2, ay = prev.y - 30, by2 = sp.y - 30;
+      for (i = 1; i <= 4; i++) { var u = i / 5; coinsW.push({ x: ax + (cx - ax) * u, y: ay + (by2 - ay) * u - Math.sin(u * Math.PI) * 44 * k }); }
+    }
+  }
+  // アイテム: ときどき、足場の上に浮いている。バリア(1 回だけ当たりを防ぐ)と、じしゃく(しばらくコインを引き寄せる)
+  // すり抜ける子(わたぐも)は当たらないので、バリアは出さない
+  var MAG_T = 600, MAG_R = 120;
+  function placeItem(sp, m) {
+    if (m < 250 || sp.type !== BEAM || Math.random() >= .014) return;
+    items.push({ k: !CH.ghost && Math.random() < .5 ? 'shield' : 'magnet', x: sp.x + sp.w / 2, y: sp.y - 38, ph: rnd(0, 6.28) });
+  }
+  function stepCoins() {
+    var pcx = pl.x + pl.w / 2, pcy = pl.y + pl.h / 2, i, dx, dy, d;
+    if (magT > 0) magT--;
+    if (comboT > 0 && --comboT === 0) comboN = 0;
+    for (i = coinsW.length - 1; i >= 0; i--) {
+      var c = coinsW[i];
+      if (c.y > camY + H + 140) { coinsW.splice(i, 1); continue; }
+      dx = pcx - c.x; dy = pcy - c.y;
+      if (dx > 150 || dx < -150 || dy > 150 || dy < -150) continue;
+      d = Math.sqrt(dx * dx + dy * dy);
+      if (magT > 0 && d < MAG_R && d > 1) { var pull = Math.min(d, 9.5); c.x += dx / d * pull; c.y += dy / d * pull; d -= pull; }
+      if (d < 24 && !rocketOn) {
+        coinsW.splice(i, 1);
+        picked++; comboN++; comboT = 70;
+        Snd.sfx('pick', comboN);
+        parts.push({ x: c.x, y: c.y, vx: 0, vy: -1.2, life: .55, sh: 'star', r: 3.4 });
+        elCoin.textContent = picked * COIN_V + bonusC;
+      }
+    }
+    for (i = items.length - 1; i >= 0; i--) {
+      var it = items[i];
+      if (it.y > camY + H + 140) { items.splice(i, 1); continue; }
+      dx = pcx - it.x; dy = pcy - it.y;
+      if (dx * dx + dy * dy < 30 * 30 && !rocketOn) {
+        items.splice(i, 1);
+        Snd.sfx('power');
+        burst(it.x, it.y, it.k === 'shield' ? '#9fe8ff' : '#ff9a9a', 12);
+        if (it.k === 'shield') { pl.shield = true; toastQ.push('🛡 バリア！ 1回だけ守ってくれる'); }
+        else { magT = MAG_T; toastQ.push('🧲 じしゃく！ コインを引き寄せる'); }
+      }
+    }
+  }
+  // コインの絵: くるくる回る 6 コマを先に作っておき、毎コマは貼るだけ。白い雪景色の前でも見えるよう、濃いふちを付ける
+  var coinFr = null, itemFr = null, COIN_SX = [1, .8, .46, .14, .46, .8];
+  function buildCoinFr() {
+    coinFr = COIN_SX.map(function (sx) {
+      return sprite(24, 24, function (g) {
+        g.translate(12, 12);
+        g.fillStyle = '#8a4e00'; ell(g, 0, 0, 9.4 * sx + 1.2, 10.4); g.fill();
+        g.fillStyle = '#f0a200'; ell(g, 0, 0, 8.6 * sx + .5, 9); g.fill();
+        g.fillStyle = '#ffd94a'; ell(g, 0, -.9, 7.2 * sx + .3, 7.4); g.fill();
+        if (sx > .4) {
+          g.save(); g.scale(sx, 1);
+          starPath(g, 0, 0, 4.4, 1, .5); g.fillStyle = '#fff6c4'; g.fill();
+          g.restore();
+          g.fillStyle = 'rgba(255,255,255,.8)'; ell(g, -3.4 * sx, -4.2, 1.6 * sx, 1); g.fill();
+        }
+      });
+    });
+  }
+  function buildItemFr() {
+    itemFr = {};
+    ['shield', 'magnet'].forEach(function (k) {
+      itemFr[k] = sprite(40, 40, function (g) {
+        g.translate(20, 20);
+        var col = k === 'shield' ? '90,200,255' : '255,120,120';
+        var gr = g.createRadialGradient(-4, -5, 2, 0, 0, 17);
+        gr.addColorStop(0, 'rgba(255,255,255,.95)'); gr.addColorStop(.55, 'rgba(' + col + ',.55)'); gr.addColorStop(1, 'rgba(' + col + ',.85)');
+        g.fillStyle = gr; ell(g, 0, 0, 16, 16); g.fill();
+        g.strokeStyle = 'rgba(20,40,100,.75)'; g.lineWidth = 2.6; g.stroke();
+        g.strokeStyle = '#fff'; g.lineWidth = 1.4; g.stroke();
+        g.lineJoin = 'round'; g.lineCap = 'round';
+        if (k === 'shield') {
+          g.beginPath(); g.moveTo(0, -8.5); g.lineTo(7, -5.5); g.lineTo(7, 0); g.quadraticCurveTo(6, 6.5, 0, 9.5); g.quadraticCurveTo(-6, 6.5, -7, 0); g.lineTo(-7, -5.5); g.closePath();
+          g.fillStyle = '#2f7fe0'; g.fill(); g.strokeStyle = '#143a8a'; g.lineWidth = 1.6; g.stroke();
+          g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.moveTo(-3, 0); g.lineTo(-.6, 2.8); g.lineTo(3.4, -2.6); g.stroke();
+        } else {
+          g.strokeStyle = '#7a1420'; g.lineWidth = 8.4; g.beginPath(); g.moveTo(-5.5, 7); g.lineTo(-5.5, -1); g.arc(0, -1, 5.5, Math.PI, 0); g.lineTo(5.5, 7); g.stroke();
+          g.strokeStyle = '#e8303f'; g.lineWidth = 5.6; g.lineCap = 'butt'; g.beginPath(); g.moveTo(-5.5, 7.6); g.lineTo(-5.5, -1); g.arc(0, -1, 5.5, Math.PI, 0); g.lineTo(5.5, 7.6); g.stroke();
+          g.strokeStyle = '#fff'; g.beginPath(); g.moveTo(-5.5, 7.6); g.lineTo(-5.5, 3.8); g.moveTo(5.5, 7.6); g.lineTo(5.5, 3.8); g.stroke();
+        }
+      });
+    });
+  }
+  function drawCoins() {
+    var i, y;
+    if (coinsW.length) {
+      if (!coinFr) buildCoinFr();
+      var f0 = frame >> 2;
+      for (i = 0; i < coinsW.length; i++) {
+        var c = coinsW[i]; y = c.y - camY;
+        if (y < -14 || y > H + 14) continue;
+        ctx.drawImage(coinFr[(f0 + ((c.x * .11) | 0)) % 6], c.x - 12, y - 12, 24, 24);
+      }
+    }
+    if (items.length) {
+      if (!itemFr) buildItemFr();
+      for (i = 0; i < items.length; i++) {
+        var it = items[i]; y = it.y - camY + Math.sin(frame * .07 + it.ph) * 4;
+        if (y < -24 || y > H + 24) continue;
+        var pu = 1 + .06 * Math.sin(frame * .14 + it.ph);
+        ctx.drawImage(itemFr[it.k], it.x - 20 * pu, y - 20 * pu, 40 * pu, 40 * pu);
+      }
+    }
+  }
+  // ベストの線: この回を始めたときのベストの高さに、金色の点線と札を出す。近づくと「あそこを越えたい」になる
+  function drawBestLine() {
+    if (runBest0 < 30) return;
+    var y = mToY(runBest0) - camY;
+    if (y < -20 || y > H + 20) return;
+    ctx.save();
+    ctx.globalAlpha = bestPassed ? .45 : .9;
+    ctx.strokeStyle = 'rgba(60,40,0,.55)'; ctx.lineWidth = 4; ctx.setLineDash([10, 8]);
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.strokeStyle = '#ffd94a'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = '800 12px system-ui, sans-serif';
+    var txt = 'ベスト ' + runBest0 + 'm', tw = ctx.measureText(txt).width + 16;
+    ctx.fillStyle = 'rgba(40,28,0,.8)'; rr(W - tw - 8, y - 22, tw, 19, 9.5); ctx.fill();
+    ctx.fillStyle = '#ffe27a'; ctx.textAlign = 'left'; ctx.fillText(txt, W - tw, y - 8.5);
+    ctx.restore();
+  }
+  // 一時停止明けの秒読み: いきなり動き出すと、指を置く前に落ちる。3・2・1 のあいだに指を置ける
+  function drawCountdown() {
+    if (resumeT <= 0) return;
+    var n = Math.ceil(resumeT / 30), u = 1 - (resumeT % 30 || 30) / 30;
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.globalAlpha = Math.min(1, 1.6 - u * 1.2);
+    ctx.translate(W / 2, H * .42); ctx.scale(1.25 - u * .25, 1.25 - u * .25);
+    ctx.font = '800 110px system-ui, sans-serif';
+    ctx.lineWidth = 10; ctx.strokeStyle = 'rgba(10,20,60,.75)'; ctx.lineJoin = 'round'; ctx.strokeText(n, 0, 0);
+    ctx.fillStyle = '#fff'; ctx.fillText(n, 0, 0);
+    ctx.restore();
   }
 
   // 5000m 月面基地 / 10000m 星の港 / 20000m〜 銀河ゲート
@@ -1462,6 +1654,17 @@
     ctx.beginPath(); ctx.moveTo(cx, bot + 8); ctx.lineTo(cx - 6, bot - 1); ctx.lineTo(cx + 6, bot - 1); ctx.closePath(); ctx.stroke(); ctx.fill();
     ctx.restore();
   }
+  // まわる足場の通り道: 点線の輪と、中心の小さな星。どこを通るかが先に分かる
+  function drawOrbitRing(p) {
+    var cx = p.ox + p.w / 2, cy = p.by - camY + 5;
+    ctx.save();
+    ctx.setLineDash([3, 7]); ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(150,230,255,.6)'; ctx.lineWidth = 1.8;
+    ell(ctx, cx, cy, ORB_RX, ORB_RY); ctx.stroke();
+    ctx.setLineDash([]);
+    twinkle(ctx, cx, cy, 2.2, .6 + .4 * Math.sin(frame * .1 + p.ph));
+    ctx.restore();
+  }
   function drawPlat(p) {
     var y = p.y - camY;
     if (p.type === UPDRAFT) { if (!p.dead && y > -10 && y - UPDRAFT_H < H) drawUpdraft(p, y); return; }
@@ -1472,6 +1675,7 @@
 
     if (p.type === MILE) { drawMile(p, y); return; }
     if (p.type === ELEVATOR) drawLiftRail(p);
+    if (p.type === ORBIT) drawOrbitRing(p);
     if (drawPlatArt(p, x, y)) return;
 
     // 宇宙ステーション（ゴール足場）
@@ -1752,6 +1956,7 @@
       case BEAM: return p.y < goalY ? 'space' : 'beam';
       case GONDOLA: return 'gondola';
       case ELEVATOR: return 'lift';
+      case ORBIT: return 'space';
       // ばね: ふだんは縮んだ絵(背が低い)、乗った瞬間だけ伸びた絵にして、はずむ動きに見せる
       case TRAMPO: return p.hitT > 0 ? 'trampo' : 'trampo2';
       case BOOST: return 'boost';
@@ -2223,6 +2428,23 @@
       ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(cx, cy, hr, Math.PI * 1.1, Math.PI * 1.45); ctx.stroke();
     }
+    // バリア: 体を包む泡。じしゃく: 残り時間の輪
+    if (pl.shield) {
+      ctx.globalAlpha = 1;
+      var sr = 37 + Math.sin(frame * .12) * 1.2;
+      ctx.fillStyle = 'rgba(120,215,255,.16)'; ctx.beginPath(); ctx.arc(cx, cy, sr, 0, 6.2832); ctx.fill();
+      ctx.strokeStyle = 'rgba(20,70,160,.5)'; ctx.lineWidth = 4.5; ctx.stroke();
+      ctx.strokeStyle = 'rgba(170,238,255,.95)'; ctx.lineWidth = 2.4; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(cx, cy, sr - 5, Math.PI * 1.12 + frame * .02, Math.PI * 1.4 + frame * .02); ctx.stroke();
+    }
+    if (magT > 0) {
+      ctx.globalAlpha = magT < 90 && (magT >> 3) % 2 ? .35 : .95;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(90,10,20,.5)'; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.arc(cx, cy, 44, -Math.PI / 2, -Math.PI / 2 + 6.2832 * magT / MAG_T); ctx.stroke();
+      ctx.strokeStyle = '#ff6b78'; ctx.lineWidth = 3.4; ctx.stroke();
+    }
     // 感電中: まわりに小さな稲妻がはじける
     if (pl.shockT > 0) {
       ctx.globalAlpha = 1; ctx.strokeStyle = '#fff3a0'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -2283,26 +2505,36 @@
   }
 
   // ===== じゃまもの =====
+  // 返す値: 当たって弾かれたら true(バリアで防いだ・無敵中は false)
   function knock(dx, down, push) {
-    if (invuln > 0 || rocketOn) return;
+    if (invuln > 0 || rocketOn) return false;
+    if (pl.shield) {   // バリア: 1 回だけ防いで、割れる
+      pl.shield = false; invuln = 60; shake = Math.max(shake, 4);
+      Snd.sfx('pop');
+      burst(pl.x + pl.w / 2, pl.y + pl.h / 2, '#9fe8ff', 18);
+      return false;
+    }
     Snd.sfx('hit');
+    shake = Math.max(shake, down ? 9 : 6);
     if (CH.tough) {
       invuln = 45;
       pl.kx = dx * 1.1;
       burst(pl.x + pl.w / 2, pl.y + pl.h / 2, '#ffffff', 10);
-      return;
+      return true;
     }
     invuln = 85;
     pl.vy = Math.max(pl.vy, down || 2.6);
     pl.kx = dx * (push || 3.6);
     burst(pl.x + pl.w / 2, pl.y + pl.h / 2, down ? '#fff3a0' : '#dbe6f2', down ? 16 : 8);
+    return true;
   }
   // 敵に当たった: すり抜ける子(ghost)は、薄くなるだけで落とされない。ふつうの子は、はじかれる
   // 稲妻は、ドローン・隕石より強く(下へ強く落とされ、横へも大きく飛ばされる)
   var BOLT_DOWN = 5, BOLT_PUSH = 5, BOLT_STUN = 30;   // 感電: しばらく左右に動けない(BOLT_STUN コマ)
   function hitFoe(dx, bolt) {
+    if (showerOn > 0 && invuln <= 0) showerHit = true;
     if (!CH.ghost) {
-      if (bolt) { var was = invuln; knock(dx, BOLT_DOWN, BOLT_PUSH); if (invuln > was && !CH.tough) pl.shockT = BOLT_STUN; }
+      if (bolt) { if (knock(dx, BOLT_DOWN, BOLT_PUSH) && !CH.tough) pl.shockT = BOLT_STUN; }
       else knock(dx);
       return;
     }
@@ -2436,6 +2668,57 @@
     }
     ctx.restore();
   }
+  var UFO_BEAM = 240, SHOWER_BONUS = 60;
+  function drawUfo(f) {
+    var x = f.x, y = f.y - camY, i;
+    if (y > H + 50 || y + UFO_BEAM < -20) return;
+    ctx.save();
+    if (!f.got) {
+      // 光の柱: 下へ広がり、輪が上へ流れる
+      var w0 = 20, w1 = 22 + UFO_BEAM * .09;
+      var g = ctx.createLinearGradient(0, y, 0, y + UFO_BEAM);
+      g.addColorStop(0, 'rgba(170,255,220,' + (f.pull ? .78 : .6) + ')'); g.addColorStop(.7, 'rgba(150,255,210,.18)'); g.addColorStop(1, 'rgba(150,255,210,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.moveTo(x - w0, y + 6); ctx.lineTo(x + w0, y + 6); ctx.lineTo(x + w1, y + UFO_BEAM); ctx.lineTo(x - w1, y + UFO_BEAM); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#e4fff2'; ctx.lineWidth = 1.6;
+      for (i = 0; i < 4; i++) {
+        var d = UFO_BEAM - ((frame * 2.2 + i * UFO_BEAM / 4) % UFO_BEAM), hw = w0 + d * .09;
+        ctx.globalAlpha = Math.sin(d / UFO_BEAM * Math.PI) * .75;
+        ell(ctx, x, y + d, hw, hw * .2); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+    y += Math.sin(f.t * .08) * 2;
+    // ドームと、中の宇宙人
+    ctx.lineWidth = 1.6; ctx.strokeStyle = '#27407e';
+    ctx.fillStyle = 'rgba(170,238,255,.55)';
+    ctx.beginPath(); ctx.arc(x, y - 5, 14, Math.PI, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#7fe08a'; ell(ctx, x, y - 9.5, 5.6, 5); ctx.fill();
+    ctx.fillStyle = '#1c2a3a'; ell(ctx, x - 2.2, y - 10, 1.3, 1.9); ctx.fill(); ell(ctx, x + 2.2, y - 10, 1.3, 1.9); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(x, y - 5, 11, Math.PI * 1.15, Math.PI * 1.45); ctx.stroke();
+    // 円盤
+    var gr = ctx.createLinearGradient(0, y - 9, 0, y + 10);
+    gr.addColorStop(0, '#f2f6fc'); gr.addColorStop(.5, '#aebad0'); gr.addColorStop(1, '#66748e');
+    ctx.fillStyle = gr; ctx.strokeStyle = '#27407e'; ctx.lineWidth = 1.6;
+    ell(ctx, x, y, 36, 10); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#4c5874'; ell(ctx, x, y + 6, 15, 4); ctx.fill();
+    for (i = -2; i <= 2; i++) {
+      ctx.fillStyle = ((frame >> 3) + i + 20) % 3 === 0 ? '#fff6b0' : '#ff9a5b';
+      ctx.beginPath(); ctx.arc(x + i * 13, y + 1.5 - Math.abs(i) * 1.1, 2.4, 0, 6.2832); ctx.fill();
+    }
+    ctx.restore();
+  }
+  // 流星群のあいだ、画面の上に知らせを出す
+  function drawShower() {
+    if (showerOn <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, showerOn / 20) * (.55 + .45 * Math.abs(Math.sin(frame * .12)));
+    ctx.font = '800 14px system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(60,10,0,.7)'; ctx.lineJoin = 'round';
+    ctx.strokeText('☄ 流星群', W / 2, H * .115); ctx.fillStyle = '#ffb38a'; ctx.fillText('☄ 流星群', W / 2, H * .115);
+    ctx.restore();
+  }
   function countFoe(k) {
     var n = 0;
     for (var i = 0; i < foes.length; i++) if (foes[i].k === k) n++;
@@ -2462,6 +2745,32 @@
         }
         debrisT = rnd(170, 330) / (1 + .25 * lv);
       }
+      // 流星群(3000m から): 予告のあと、同じ向きの隕石が 5 秒ほど続けて降る。1 つも当たらずに抜けると、ごほうびのコイン
+      if (showerOn > 0) {
+        debrisT = Math.max(debrisT, 120);   // そのあいだ、ふつうの隕石は出さない
+        if (showerOn % 24 === 0 && showerOn > 50 && showerOn <= 300) {
+          var svy = rnd(6.5, 8), sx0 = rnd(-40, W + 40) - showerDir * 150;
+          foes.push({ k: 'debris', st: 'warn', t: 44, x: sx0, oy: -50, y: camY - 50, vx: showerDir * rnd(2.3, 2.9), vy: svy, rot: rnd(0, 6.28), rv: rnd(-.12, .12) });
+        }
+        if (--showerOn === 0) {
+          if (!showerHit) {
+            bonusC += SHOWER_BONUS; elCoin.textContent = picked * COIN_V + bonusC;
+            toastQ.push('☄ よけきった！ +' + SHOWER_BONUS + 'コイン'); Snd.sfx('coin');
+          }
+          showerT = rnd(2400, 3600);
+        }
+      } else if (hm >= 3000 && --showerT <= 0) {
+        showerOn = 345; showerDir = Math.random() < .5 ? -1 : 1; showerHit = false;
+        toastQ.push('☄ 流星群がくる！'); Snd.sfx('alarm');
+      }
+      // UFO(5000m から): ときどき現れて、左右にゆっくり動く。下の光の柱に入ると吸い上げられ、上へ大きく打ち上げてくれる
+      if (hm >= 5000 && --ufoT <= 0) {
+        if (countFoe('ufo') < 1) {
+          foes.push({ k: 'ufo', st: 'go', t: 0, x: rnd(70, W - 70), y: camY - 90, vx: (Math.random() < .5 ? -1 : 1) * rnd(.6, 1.1), got: false, pull: false });
+          if (!ufoSeen) { ufoSeen = true; toastQ.push('🛸 UFO！ 光に入ると打ち上げてくれる'); }
+        }
+        ufoT = rnd(1500, 2600);
+      }
     }
     // 稲妻(雷雲の海): 予告の線が出て、約 1.2 秒あと、その場所に画面の上から下まで落ちる。横へ動けば避けられる
     if (cheer <= 0 && stage === 'storm' && hm > 150 && hm < STORM_TOP && --boltT <= 0) {
@@ -2472,9 +2781,32 @@
     }
     for (var i = foes.length - 1; i >= 0; i--) {
       var f = foes[i];
+      if (f.k === 'ufo') {
+        f.t++;
+        if (f.got) {   // 打ち上げたあとは、飛び去る(打ち上げられた子の方が速いので、画面の下へ外れても消す)
+          f.y -= 6; f.x += f.vx * 4;
+          if (f.y < camY - 260 || f.y > camY + H + 140 || f.t > 900) foes.splice(i, 1);
+          continue;
+        }
+        f.x += f.vx;
+        if (f.x < 50 || f.x > W - 50) f.vx *= -1;
+        var ucx = pl.x + pl.w / 2, ucy = pl.y + pl.h / 2, ud2 = ucy - f.y;
+        if (!rocketOn && ud2 > 0 && ud2 < UFO_BEAM && Math.abs(ucx - f.x) < 22 + ud2 * .09) {
+          if (!f.pull) { f.pull = true; Snd.sfx('ufo'); }
+          pl.vy = Math.max(pl.vy - 1.2, -7.5);
+          pl.x += (f.x - ucx) * .1;
+          if (frame % 3 === 0) burst(ucx, pl.y + pl.h, 'rgba(190,255,225,.9)', 1);
+          if (ud2 < 40) {
+            f.got = true; pl.vy = BF; pl.sq = .9; invuln = Math.max(invuln, 70); shake = Math.max(shake, 4);
+            Snd.sfx('boost'); burst(ucx, ucy, '#b6ffd9', 20);
+          }
+        } else f.pull = false;
+        if (f.y > camY + H + 140) foes.splice(i, 1);
+        continue;
+      }
       if (f.k === 'bolt') {
         if (f.st === 'warn') {
-          if (--f.t <= 0) { f.st = 'go'; f.t = 12; f.pts = boltPts(f.x); flashScreen(true); Snd.sfx('thunder'); Snd.duck(.3); }
+          if (--f.t <= 0) { f.st = 'go'; f.t = 12; f.pts = boltPts(f.x); flashScreen(true); Snd.sfx('thunder'); Snd.duck(.3); shake = Math.max(shake, 5); }
         } else {
           if ((CH.ghost || invuln <= 0) && pl.x + pl.w > f.x - 13 && pl.x < f.x + 13) hitFoe(pl.x + pl.w / 2 < f.x ? -1 : 1, true);
           if (--f.t <= 0) foes.splice(i, 1);
@@ -2517,6 +2849,7 @@
   function drawFoes() {
     for (var i = 0; i < foes.length; i++) {
       var f = foes[i];
+      if (f.k === 'ufo') { drawUfo(f); continue; }
       if (f.k === 'bolt') { drawBolt(f); continue; }
       if (f.k === 'drone') {
         if (f.st === 'warn') { edgeWarn(f.dir, f.y - camY); continue; }
@@ -2756,6 +3089,9 @@
       q.py = q.y;
       if (q.type === ELEVATOR) {
         q.y = liftY(q);
+      } else if (q.type === ORBIT) {
+        var oa = frame * q.lw + q.ph;
+        q.x = q.ox + Math.cos(oa) * ORB_RX; q.y = q.by + Math.sin(oa) * ORB_RY;
       } else if (q.type === GONDOLA) {
         q.x += q.dir * q.sp;
         if (q.x < 0 || q.x + q.w > W) q.dir *= -1;
@@ -2768,9 +3104,11 @@
       }
     }
 
+    stepCoins();
     stepWeather();
     stepFoes();
     stepSpace();
+    if (shake > 0) { shake *= .86; if (shake < .3) shake = 0; }
 
     var want = pl.y - H * .38;
     if (want < camY) camY += (want - camY) * .11;
@@ -2778,7 +3116,17 @@
     if (cap < camY) camY = cap;
 
     var cur = Math.floor(hm);
-    if (cur > score) { score = cur; elM.textContent = score; checkTitles(); }
+    if (cur > score) {
+      score = cur; elM.textContent = score; checkTitles();
+      // ベストを越えた瞬間に知らせる(その回に 1 度だけ)。越えたあとは、右上のベストもいっしょに伸びていく
+      if (runBest0 > 0 && score > runBest0) {
+        if (!bestPassed) {
+          bestPassed = true; elBest.parentNode.classList.add('new');
+          toastQ.push('🎉 ベスト更新！'); Snd.sfx('chime'); confetti(W / 2, camY + H * .3);
+        }
+        elBest.textContent = score;
+      }
+    }
 
     fillUpTo(camY - 120);
     for (var k = plats.length - 1; k >= 0; k--) {
@@ -2798,17 +3146,25 @@
     drawStars();
     drawSpace();
     drawStationFar();
+    // 当たったとき・雷が落ちたときは、手前のもの(足場・敵・キャラ)を少しゆらす
+    var shk = shake > 0;
+    if (shk) { ctx.save(); ctx.translate(rnd(-shake, shake), rnd(-shake, shake)); }
     drawGround();
+    drawBestLine();
     for (var i = 0; i < plats.length; i++) drawPlat(plats[i]);
+    drawCoins();
     drawFoes();
     drawParts();
     drawPlayer();
+    if (shk) ctx.restore();
     drawRain();
     drawSnow();
     drawWind();
     drawGustWarn();
+    drawShower();
     drawCheer();
     drawToast();
+    drawCountdown();
   }
 
   // 調整値はすべて 60fps の1ステップ前提。描画の速さに関係なく実時間で 60 ステップ/秒 進める
@@ -2827,8 +3183,13 @@
     if (d > MAX_STEPS * STEP_MS) d = MAX_STEPS * STEP_MS;
     acc += d;
     while (acc >= STEP_MS && run) {
-      frame++;
-      step();
+      if (resumeT > 0) {   // 秒読みのあいだは、時を進めない
+        if (resumeT % 30 === 0) Snd.sfx('tick');
+        resumeT--;
+      } else {
+        frame++;
+        step();
+      }
       acc -= STEP_MS;
     }
     paint();
@@ -2966,14 +3327,28 @@
         [79, 76, 72, 67].forEach(function (n, i) { tone(sfxBus, t + i * .16, hz(n), .3, { type: 'triangle', vol: .14 }); });
       },
       click: function (t) { tone(sfxBus, t, 900, .05, { type: 'sine', vol: .12 }); },
+      // コインを拾う: 続けて拾うほど、音が上がっていく(n: 続けて拾った数)
+      pick: function (t, n) {
+        var k = Math.min((n || 1) - 1, 9), f = hz(84 + [0, 2, 4, 5, 7, 9, 11, 12, 14, 16][k]);
+        tone(sfxBus, t, f, .07, { type: 'square', vol: .07 });
+        tone(sfxBus, t + .05, f * 1.5, .16, { type: 'square', vol: .07 });
+      },
+      power: function (t) { [72, 76, 79, 84, 88].forEach(function (n, i) { tone(sfxBus, t + i * .05, hz(n), .16, { type: 'triangle', vol: .13 }); }); },
+      pop: function (t) {
+        noise(sfxBus, t, .16, { type: 'bandpass', f: 2400, to: 500, q: .8, vol: .4 });
+        tone(sfxBus, t, 900, .18, { type: 'sine', to: 240, vol: .14 });
+      },
+      tick: function (t) { tone(sfxBus, t, 660, .09, { type: 'triangle', vol: .16 }); },
+      alarm: function (t) { for (var i = 0; i < 3; i++) { tone(sfxBus, t + i * .22, 880, .1, { type: 'square', vol: .09 }); tone(sfxBus, t + i * .22 + .1, 660, .1, { type: 'square', vol: .09 }); } },
+      ufo: function (t) { for (var i = 0; i < 4; i++) tone(sfxBus, t + i * .09, 500 + i * 140, .12, { type: 'sine', to: 760 + i * 140, vol: .12 }); },
       coin: function (t) {
         tone(sfxBus, t, hz(88), .1, { type: 'square', vol: .12 });
         tone(sfxBus, t + .08, hz(93), .35, { type: 'square', vol: .12 });
       }
     };
-    function sfx(name) {
+    function sfx(name, a) {
       if (!pref.sfx || !live() || !FX[name]) return;
-      FX[name](ac.currentTime + .005);
+      FX[name](ac.currentTime + .005, a);
     }
 
     // ----- 音楽 -----
@@ -3151,6 +3526,10 @@
     fit(); initBg();
     score = 0; camY = 0; frame = 0; hm = 0; invuln = 0;
     parts = []; foes = []; plats = [];
+    coinsW = []; items = []; picked = 0; bonusC = 0; comboN = 0; comboT = 0; magT = 0; shake = 0; resumeT = 0;
+    ufoT = 600; ufoSeen = false; showerT = 900; showerOn = 0; showerHit = false;
+    runBest0 = stageBest[stage] || 0; bestPassed = false;
+    elBest.parentNode.classList.remove('new'); elBest.textContent = runBest0; elCoin.textContent = '0';
     droneT = 260; debrisT = 300; boltT = 220; flashT = 300; rain = []; snow = []; gustT = 420; gustWarn = 0; iceT = 200; stageNews = '';
     setStageBg();
     wind = 0; windTo = 0; windT = 260;
@@ -3200,14 +3579,20 @@
     var got = runCoins();
     if (got > 0) addCoins(got);
     elOM.textContent = score;
-    $('oCoin').textContent = got > 0 ? ('+' + got + ' コイン' + (CH.coin ? '(' + CH.coin + '倍)' : '')) : '';
+    var extra = picked * COIN_V + bonusC;
+    $('oCoin').textContent = got > 0 ? ('+' + got + ' コイン' + (CH.coin ? '(' + CH.coin + '倍)' : '') + (extra > 0 ? '・うち ひろった分 ' + extra : '')) : '';
+    $('oNew').hidden = !(bestPassed || (runBest0 === 0 && score > 0));
+    $('oBest').textContent = 'ベスト ' + (stageBest[stage] || 0) + 'm';
+    vOver.classList.add('lock');
+    setTimeout(function () { vOver.classList.remove('lock'); }, 450);
     var news = runUnlocks.map(function (n) { return n + 'が仲間になった！'; });
     if (runTitles.length) news.push('称号「' + runTitles.join('」「') + '」を手に入れた！');
     if (stageNews) { news.push(stageNews); stageNews = ''; }
     var sb = stageBest[stage] || 0;
     elNote.textContent = news.length ? news.join(' ')
       : topMile >= 0 ? mileName(topMile) + '(' + mileAt(topMile) + 'm)に到達'
-      : (score >= sb && score > 0 ? 'ベスト更新' : 'ベストまで あと ' + Math.max(1, sb - score) + 'm');
+      : bestPassed ? '前のベストから +' + (score - runBest0) + 'm'
+      : (score >= sb && score > 0 ? 'はじめての記録' : 'ベストまで あと ' + Math.max(1, sb - score) + 'm');
     vOver.classList.add('on');
   }
 
@@ -3224,6 +3609,7 @@
     paused = false;
     vPause.classList.remove('on');
     Snd.hold(false);
+    resumeT = 90;   // 3・2・1(1.5 秒)
     run = true;
     kick();
   }
@@ -3272,7 +3658,9 @@
   fit();
   cv.addEventListener('touchstart', function (e) { e.preventDefault(); touchX = tx(e); }, { passive: false });
   cv.addEventListener('touchmove', function (e) { e.preventDefault(); touchX = tx(e); }, { passive: false });
-  cv.addEventListener('touchend', function (e) { e.preventDefault(); touchX = null; }, { passive: false });
+  // 指を 1 本離しても、もう 1 本が残っていれば、そちらを追う(持ち替えたときに止まらない)
+  cv.addEventListener('touchend', function (e) { e.preventDefault(); touchX = e.touches.length ? tx(e) : null; }, { passive: false });
+  cv.addEventListener('touchcancel', function () { touchX = null; });
   cv.addEventListener('mousedown', function (e) {
     var r = cv.getBoundingClientRect(); touchX = e.clientX - r.left;
   });
